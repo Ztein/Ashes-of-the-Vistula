@@ -12,9 +12,73 @@ var infantry_count: int = 0
 var cavalry_count: int = 0
 var artillery_count: int = 0
 
+var infantry_hp_pool: float = 0.0
+var cavalry_hp_pool: float = 0.0
+var artillery_hp_pool: float = 0.0
+
 var is_moving: bool = false
 var move_target_city_id: int = -1
 var move_progress: float = 0.0
+
+
+func init_hp_pools(balance: Dictionary) -> void:
+	var units_config: Dictionary = balance.get("units", {})
+	var inf_hp: float = float(units_config.get("infantry", {}).get("hp", 100))
+	var cav_hp: float = float(units_config.get("cavalry", {}).get("hp", 80))
+	var art_hp: float = float(units_config.get("artillery", {}).get("hp", 60))
+	infantry_hp_pool = infantry_count * inf_hp
+	cavalry_hp_pool = cavalry_count * cav_hp
+	artillery_hp_pool = artillery_count * art_hp
+
+
+func get_total_hp() -> float:
+	return infantry_hp_pool + cavalry_hp_pool + artillery_hp_pool
+
+
+func apply_damage_with_priority(damage: float, balance: Dictionary) -> void:
+	## Applies damage in priority order: artillery -> cavalry -> infantry.
+	## When a unit type's HP pool is depleted, removes units and spills
+	## remaining damage to the next type.
+	var units_config: Dictionary = balance.get("units", {})
+	var remaining := damage
+
+	# Priority 1: Artillery
+	if remaining > 0.0 and artillery_hp_pool > 0.0:
+		artillery_hp_pool -= remaining
+		if artillery_hp_pool <= 0.0:
+			remaining = -artillery_hp_pool
+			artillery_hp_pool = 0.0
+			artillery_count = 0
+		else:
+			remaining = 0.0
+			# Update count based on remaining HP
+			var art_hp_each: float = float(units_config.get("artillery", {}).get("hp", 60))
+			if art_hp_each > 0:
+				artillery_count = ceili(artillery_hp_pool / art_hp_each)
+
+	# Priority 2: Cavalry
+	if remaining > 0.0 and cavalry_hp_pool > 0.0:
+		cavalry_hp_pool -= remaining
+		if cavalry_hp_pool <= 0.0:
+			remaining = -cavalry_hp_pool
+			cavalry_hp_pool = 0.0
+			cavalry_count = 0
+		else:
+			remaining = 0.0
+			var cav_hp_each: float = float(units_config.get("cavalry", {}).get("hp", 80))
+			if cav_hp_each > 0:
+				cavalry_count = ceili(cavalry_hp_pool / cav_hp_each)
+
+	# Priority 3: Infantry
+	if remaining > 0.0 and infantry_hp_pool > 0.0:
+		infantry_hp_pool -= remaining
+		if infantry_hp_pool <= 0.0:
+			infantry_hp_pool = 0.0
+			infantry_count = 0
+		else:
+			var inf_hp_each: float = float(units_config.get("infantry", {}).get("hp", 100))
+			if inf_hp_each > 0:
+				infantry_count = ceili(infantry_hp_pool / inf_hp_each)
 
 
 func total_units() -> int:

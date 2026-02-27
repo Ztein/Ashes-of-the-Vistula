@@ -1,5 +1,5 @@
 extends BaseTest
-## Unit tests for the CombatResolver — siege phase.
+## Unit tests for the CombatResolver — siege and battle phases.
 
 var _balance: Dictionary
 
@@ -28,6 +28,7 @@ func _make_stack(inf: int = 3, cav: int = 2, art: int = 1, owner: int = 0) -> Un
 	stack.infantry_count = inf
 	stack.cavalry_count = cav
 	stack.artillery_count = art
+	stack.init_hp_pools(_balance)
 	return stack
 
 
@@ -148,3 +149,139 @@ func test_siege_damage_values_from_config() -> void:
 	# infantry siege_damage = 5, tick_delta = 0.1, so damage = 5 * 0.1 = 0.5
 	var expected_damage: float = 5.0 * float(_balance["simulation"]["tick_delta"])
 	assert_approx(city.structure_hp, hp_before - expected_damage, 0.01, "damage should match config")
+
+
+# --- Battle Phase ---
+
+func test_battle_deals_simultaneous_damage_to_both_sides() -> void:
+	var resolver := CombatResolver.new()
+	var attacker := _make_stack(5, 0, 0, 0)
+	var defender := _make_stack(5, 0, 0, 1)
+	var att_hp_before := attacker.get_total_hp()
+	var def_hp_before := defender.get_total_hp()
+
+	resolver.tick_battle([attacker], [defender], _balance)
+
+	assert_lt(attacker.get_total_hp(), att_hp_before, "attacker should take damage")
+	assert_lt(defender.get_total_hp(), def_hp_before, "defender should take damage")
+
+
+func test_battle_targets_artillery_first() -> void:
+	var resolver := CombatResolver.new()
+	# Attacker has high DPS, defender has all three types
+	var attacker := _make_stack(10, 0, 0, 0)
+	var defender := _make_stack(3, 3, 3, 1)
+	var def_art_hp_before := defender.artillery_hp_pool
+
+	resolver.tick_battle([attacker], [defender], _balance)
+
+	# Artillery should take damage first (priority target)
+	assert_lt(defender.artillery_hp_pool, def_art_hp_before, "artillery targeted first")
+
+
+func test_battle_targets_cavalry_after_artillery_eliminated() -> void:
+	var resolver := CombatResolver.new()
+	var attacker := _make_stack(10, 5, 0, 0)
+	# Defender: no artillery, has cavalry and infantry
+	var defender := _make_stack(5, 3, 0, 1)
+	var def_cav_hp_before := defender.cavalry_hp_pool
+
+	resolver.tick_battle([attacker], [defender], _balance)
+
+	assert_lt(defender.cavalry_hp_pool, def_cav_hp_before, "cavalry targeted when no artillery")
+
+
+func test_battle_targets_infantry_last() -> void:
+	var resolver := CombatResolver.new()
+	var attacker := _make_stack(10, 0, 0, 0)
+	# Defender: only infantry
+	var defender := _make_stack(5, 0, 0, 1)
+	var def_inf_hp_before := defender.infantry_hp_pool
+
+	resolver.tick_battle([attacker], [defender], _balance)
+
+	assert_lt(defender.infantry_hp_pool, def_inf_hp_before, "infantry targeted when only type")
+
+
+func test_battle_damage_spills_to_next_priority_type() -> void:
+	var resolver := CombatResolver.new()
+	# Very strong attacker vs defender with 1 artillery and 5 infantry
+	var attacker := _make_stack(20, 10, 0, 0)
+	var defender := _make_stack(5, 0, 1, 1)  # 1 artillery, 5 infantry
+
+	# Tick enough times to eliminate artillery
+	for i in range(50):
+		resolver.tick_battle([attacker], [defender], _balance)
+		if defender.artillery_count == 0:
+			break
+
+	# Artillery should be eliminated, and infantry should also have taken spill damage
+	assert_eq(defender.artillery_count, 0, "artillery should be eliminated")
+	assert_lt(defender.infantry_hp_pool, 5.0 * 100.0, "infantry should have taken spill damage")
+
+
+func test_attacker_wins_when_all_defenders_eliminated() -> void:
+	var resolver := CombatResolver.new()
+	var attacker := _make_stack(20, 10, 5, 0)
+	var defender := _make_stack(2, 0, 0, 1)  # small defender
+
+	# Battle until resolution
+	var result_code := CombatResolver.ONGOING
+	for i in range(500):
+		var result := resolver.tick_battle([attacker], [defender], _balance)
+		result_code = result["result"]
+		if result_code != CombatResolver.ONGOING:
+			break
+
+	assert_eq(result_code, CombatResolver.ATTACKER_WIN, "attacker should win")
+	assert_true(defender.is_empty(), "defender should be eliminated")
+
+
+func test_defender_wins_when_all_attackers_eliminated() -> void:
+	var resolver := CombatResolver.new()
+	var attacker := _make_stack(1, 0, 0, 0)  # tiny attacker
+	var defender := _make_stack(20, 10, 5, 1)
+
+	var result_code := CombatResolver.ONGOING
+	for i in range(500):
+		var result := resolver.tick_battle([attacker], [defender], _balance)
+		result_code = result["result"]
+		if result_code != CombatResolver.ONGOING:
+			break
+
+	assert_eq(result_code, CombatResolver.DEFENDER_WIN, "defender should win")
+	assert_true(attacker.is_empty(), "attacker should be eliminated")
+
+
+func test_battle_is_deterministic_same_inputs_same_outputs() -> void:
+	var resolver_a := CombatResolver.new()
+	var resolver_b := CombatResolver.new()
+
+	# Run two identical battles
+	var att_a := _make_stack(5, 3, 1, 0)
+	var def_a := _make_stack(4, 2, 1, 1)
+	var att_b := _make_stack(5, 3, 1, 0)
+	var def_b := _make_stack(4, 2, 1, 1)
+
+	for i in range(50):
+		resolver_a.tick_battle([att_a], [def_a], _balance)
+		resolver_b.tick_battle([att_b], [def_b], _balance)
+
+	assert_eq(att_a.infantry_count, att_b.infantry_count, "deterministic inf count")
+	assert_eq(att_a.cavalry_count, att_b.cavalry_count, "deterministic cav count")
+	assert_eq(def_a.infantry_count, def_b.infantry_count, "deterministic def inf count")
+	assert_approx(att_a.infantry_hp_pool, att_b.infantry_hp_pool, 0.001, "deterministic hp pools")
+
+
+func test_battle_dps_and_hp_values_from_config() -> void:
+	var resolver := CombatResolver.new()
+	var attacker := _make_stack(1, 0, 0, 0)  # 1 infantry: hp=100, dps=10
+	var defender := _make_stack(1, 0, 0, 1)  # 1 infantry: hp=100, dps=10
+
+	resolver.tick_battle([attacker], [defender], _balance)
+
+	# Each deals 10 dps * 0.1 tick_delta = 1.0 damage per tick
+	var tick_delta: float = float(_balance["simulation"]["tick_delta"])
+	var expected_hp: float = 100.0 - 10.0 * tick_delta
+	assert_approx(attacker.infantry_hp_pool, expected_hp, 0.01, "HP reduced by config DPS")
+	assert_approx(defender.infantry_hp_pool, expected_hp, 0.01, "HP reduced by config DPS")
