@@ -131,7 +131,7 @@ func _fit_camera_to_map() -> void:
 	var min_pos := Vector2(INF, INF)
 	var max_pos := Vector2(-INF, -INF)
 	for city in cities:
-		var pixel_pos := _hex_map.get_city_pixel_pos(city.id)
+		var pixel_pos: Vector2 = _hex_map.get_city_pixel_pos(city.id)
 		min_pos.x = minf(min_pos.x, pixel_pos.x)
 		min_pos.y = minf(min_pos.y, pixel_pos.y)
 		max_pos.x = maxf(max_pos.x, pixel_pos.x)
@@ -146,7 +146,7 @@ func _fit_camera_to_map() -> void:
 	_camera.position = _map_bounds.get_center()
 
 	# Zoom to fit all cities in the viewport
-	var viewport_size := get_viewport_rect().size
+	var viewport_size: Vector2 = get_viewport_rect().size
 	var zoom_x: float = viewport_size.x / _map_bounds.size.x
 	var zoom_y: float = viewport_size.y / _map_bounds.size.y
 	var fit_zoom: float = minf(zoom_x, zoom_y)
