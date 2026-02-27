@@ -4,6 +4,9 @@
 # Godot import files
 *.import
 
+# Godot UID files
+*.uid
+
 # Build outputs
 builds/
 export_presets.cfg
