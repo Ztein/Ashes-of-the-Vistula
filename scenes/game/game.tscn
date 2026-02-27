@@ -20,31 +20,32 @@ script = ExtResource("2")
 [node name="UILayer" type="CanvasLayer" parent="."]
 layer = 10
 
-[node name="HUD" type="HBoxContainer" parent="UILayer"]
+[node name="HUD" type="VBoxContainer" parent="UILayer"]
 anchors_preset = 10
 anchor_right = 1.0
-offset_bottom = 40.0
+offset_bottom = 60.0
 grow_horizontal = 2
-theme_override_constants/separation = 30
+theme_override_constants/separation = 2
 script = ExtResource("4")
 
-[node name="SupplyLabel" type="Label" parent="UILayer/HUD"]
+[node name="PlayerRow" type="HBoxContainer" parent="UILayer/HUD"]
 layout_mode = 2
-text = "Units: 0/0"
 
-[node name="OrdersLabel" type="Label" parent="UILayer/HUD"]
+[node name="PlayerLabel" type="Label" parent="UILayer/HUD/PlayerRow"]
 layout_mode = 2
-text = "Orders: 0.0/0"
+text = "You:  --"
 
-[node name="CitiesLabel" type="Label" parent="UILayer/HUD"]
+[node name="EnemyRow" type="HBoxContainer" parent="UILayer/HUD"]
 layout_mode = 2
-text = "Cities: 0/0"
 
-[node name="TerritoryLabel" type="Label" parent="UILayer/HUD"]
+[node name="EnemyLabel" type="Label" parent="UILayer/HUD/EnemyRow"]
 layout_mode = 2
-text = "Territory: 0%"
+text = "Enemy:  --"
 
-[node name="DominanceLabel" type="Label" parent="UILayer/HUD"]
+[node name="DominanceRow" type="HBoxContainer" parent="UILayer/HUD"]
+layout_mode = 2
+
+[node name="DominanceLabel" type="Label" parent="UILayer/HUD/DominanceRow"]
 layout_mode = 2
 text = "Dominance: --"
 
