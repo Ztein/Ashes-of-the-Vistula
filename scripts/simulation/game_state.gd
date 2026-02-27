@@ -115,6 +115,7 @@ func tick() -> void:
 	var delta: float = float(_balance.get("simulation", {}).get("tick_delta", 0.1))
 
 	_tick_movement(delta)
+	_auto_start_sieges()
 	_tick_sieges()
 	_tick_battles()
 	_tick_structure_regen()
@@ -357,6 +358,26 @@ func _cmd_capture_neutral(command: Dictionary) -> bool:
 
 
 # --- Tick Sub-steps ---
+
+func _auto_start_sieges() -> void:
+	## Auto-start siege when enemy stacks are colocated at a city they don't own.
+	## No order cost — the move already cost an order and pinning makes combat unavoidable.
+	for city_obj in _cities.values():
+		var city: City = city_obj as City
+		var city_id: int = city.id
+		if _sieges.has(city_id):
+			continue  # Already under siege
+		if city.owner_id < 0:
+			continue  # Neutral city — no auto-siege
+
+		# Check if any non-moving, non-empty enemy stacks are at this city
+		for stack_obj in _stacks.values():
+			var stack: UnitStack = stack_obj as UnitStack
+			if stack.city_id == city_id and stack.owner_id != city.owner_id and not stack.is_moving and not stack.is_empty():
+				_sieges[city_id] = {"attacker_id": stack.owner_id}
+				siege_started.emit(city_id, stack.owner_id)
+				break
+
 
 func _tick_movement(delta: float) -> void:
 	for stack_obj in _stacks.values():

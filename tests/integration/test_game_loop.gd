@@ -432,9 +432,10 @@ func test_production_halts_at_supply_cap() -> void:
 	assert_eq(gs.get_supply_info(0)["current"], before, "no units produced at cap")
 
 
-# --- Siege Without Command ---
+# --- Auto-Siege ---
 
-func test_stack_at_enemy_city_without_siege_deals_no_damage() -> void:
+func test_auto_siege_triggers_on_arrival_at_enemy_city() -> void:
+	## Stack arriving at enemy city automatically starts a siege.
 	var gs := _make_simple_gs()
 	var sid: int = gs.get_stacks_at_city(0, 0)[0].id
 	gs.submit_command({"type": "move_stack", "player_id": 0, "stack_id": sid, "target_city_id": 1})
@@ -444,11 +445,55 @@ func test_stack_at_enemy_city_without_siege_deals_no_damage() -> void:
 	for i in range(20):
 		gs.tick()
 
-	# At enemy city but no siege command issued
+	# At enemy city — siege should auto-trigger
+	assert_true(gs.is_city_under_siege(2), "siege should auto-start at enemy city")
+
+
+func test_auto_siege_deals_structure_damage() -> void:
+	## Auto-siege should reduce structure HP without explicit START_SIEGE command.
+	var gs := _make_simple_gs()
+	var sid: int = gs.get_stacks_at_city(0, 0)[0].id
+	gs.submit_command({"type": "move_stack", "player_id": 0, "stack_id": sid, "target_city_id": 1})
+	for i in range(20):
+		gs.tick()
+	gs.submit_command({"type": "move_stack", "player_id": 0, "stack_id": sid, "target_city_id": 2})
+	for i in range(20):
+		gs.tick()
+
 	var hp_before: float = gs.get_city(2).structure_hp
 	for i in range(10):
 		gs.tick()
-	assert_gte(gs.get_city(2).structure_hp, hp_before, "no damage without siege command")
+	assert_lt(gs.get_city(2).structure_hp, hp_before, "auto-siege should damage structure")
+
+
+func test_auto_siege_does_not_trigger_at_neutral_city() -> void:
+	## Stack at a neutral city should NOT auto-start siege.
+	var gs := _make_simple_gs()
+	var sid: int = gs.get_stacks_at_city(0, 0)[0].id
+	gs.submit_command({"type": "move_stack", "player_id": 0, "stack_id": sid, "target_city_id": 1})
+	for i in range(20):
+		gs.tick()
+	# City 1 is neutral
+	assert_false(gs.is_city_under_siege(1), "no auto-siege at neutral city")
+
+
+func test_auto_siege_does_not_trigger_at_own_city() -> void:
+	## Stack at own city should NOT auto-start siege.
+	var gs := _make_simple_gs()
+	gs.tick()
+	assert_false(gs.is_city_under_siege(0), "no auto-siege at own city")
+
+
+func test_colocated_stacks_resolve_through_full_combat() -> void:
+	## Colocated enemy stacks auto-siege → battle → capture without explicit commands.
+	var gs := _make_multi_siege_gs()  # P0 has 2 stacks (10 inf) at city 1 (P1), P1 has 3 inf
+	# No explicit START_SIEGE — auto-siege should handle it
+	assert_eq(gs.get_city(1).owner_id, 1, "city 1 starts as player 1")
+	for i in range(500):
+		gs.tick()
+		if gs.get_city(1).owner_id == 0:
+			break
+	assert_eq(gs.get_city(1).owner_id, 0, "city captured via auto-siege combat")
 
 
 # --- Game Over ---
