@@ -218,6 +218,14 @@ func get_total_hex_count() -> int:
 	return _total_hex_count
 
 
+func get_adjacency() -> Array:
+	return _adjacency
+
+
+func are_adjacent(city_a: int, city_b: int) -> bool:
+	return _are_adjacent(city_a, city_b)
+
+
 # --- Command Processing ---
 
 func _cmd_move(command: Dictionary) -> bool:

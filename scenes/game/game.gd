@@ -3,14 +3,17 @@ extends Node2D
 ## Handles: tick timer, camera, player input, command translation.
 
 const PLAYER_ID: int = 0  # Human player
+const AI_PLAYER_ID: int = 1
 const TICK_RATE: float = 10.0
 
 var _game_state: GameState
+var _ai: AIController
 var _loader := ConfigLoader.new()
 var _map_data: Dictionary = {}
 var _scenario_data: Dictionary = {}
 var _balance: Dictionary = {}
 var _tick_timer: float = 0.0
+var _tick_count: int = 0
 var _camera_speed: float = 400.0
 
 @onready var _hex_map: Node2D = $HexMap
@@ -43,6 +46,10 @@ func _ready() -> void:
 
 	_stack_info.visible = false
 
+	# Initialize AI opponent
+	_ai = AIController.new()
+	_ai.setup(AI_PLAYER_ID, _game_state, _balance)
+
 	# Center camera roughly on the map
 	_camera.position = Vector2(640, 480)
 
@@ -60,7 +67,15 @@ func _tick_simulation(delta: float) -> void:
 	var tick_interval: float = 1.0 / TICK_RATE
 	while _tick_timer >= tick_interval:
 		_tick_timer -= tick_interval
+
+		# AI evaluation
+		if _ai != null and _ai.should_evaluate(_tick_count):
+			_ai.evaluate()
+			for cmd in _ai.get_pending_commands():
+				_game_state.submit_command(cmd)
+
 		_game_state.tick()
+		_tick_count += 1
 		_hex_map.queue_redraw()
 		_update_hud()
 
