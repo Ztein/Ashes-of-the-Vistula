@@ -86,10 +86,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Scroll zoom
 	if event is InputEventMouseButton:
+		var new_zoom: float = _camera.zoom.x
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_camera.zoom = (_camera.zoom * 1.1).clampf(0.3, 3.0) * Vector2.ONE
+			new_zoom = clampf(_camera.zoom.x * 1.1, 0.3, 3.0)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_camera.zoom = (_camera.zoom * 0.9).clampf(0.3, 3.0) * Vector2.ONE
+			new_zoom = clampf(_camera.zoom.x * 0.9, 0.3, 3.0)
+		_camera.zoom = Vector2(new_zoom, new_zoom)
 
 	# Keyboard commands
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -100,6 +102,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_try_capture_neutral()
 			KEY_R:
 				_try_split()
+			KEY_TAB:
+				_cycle_stack_at_city()
 			KEY_ESCAPE:
 				_deselect_all()
 

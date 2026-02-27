@@ -34,9 +34,17 @@ text = "Supply: 0/0"
 layout_mode = 2
 text = "Orders: 0.0/0"
 
+[node name="CitiesLabel" type="Label" parent="UILayer/HUD"]
+layout_mode = 2
+text = "Cities: 0/0"
+
+[node name="TerritoryLabel" type="Label" parent="UILayer/HUD"]
+layout_mode = 2
+text = "Territory: 0%"
+
 [node name="DominanceLabel" type="Label" parent="UILayer/HUD"]
 layout_mode = 2
-text = "Tick: 0"
+text = "Dominance: --"
 
 [node name="StackInfo" type="PanelContainer" parent="UILayer"]
 anchors_preset = 3
