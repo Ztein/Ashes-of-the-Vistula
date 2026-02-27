@@ -161,20 +161,18 @@ func test_ai_respects_order_cap() -> void:
 	var gs := GameState.new()
 	gs.initialize(_make_simple_map(), _make_scenario_attack(), _balance)
 
-	# Drain orders
+	# Drain orders by issuing move commands
 	var stacks := gs.get_stacks_for_player(1)
 	for i in range(10):
 		if stacks.is_empty():
 			break
-		var s: UnitStack = stacks[0] as UnitStack
-		if s.infantry_count >= 2:
-			gs.submit_command({
-				"type": "split_stack",
-				"player_id": 1,
-				"stack_id": s.id,
-				"infantry": 1, "cavalry": 0, "artillery": 0,
-			})
-			stacks = gs.get_stacks_for_player(1)
+		var s: UnitStack = stacks[i % stacks.size()] as UnitStack
+		gs.submit_command({
+			"type": "move_stack",
+			"player_id": 1,
+			"stack_id": s.id,
+			"target_city_id": 1,
+		})
 
 	var ai := AIController.new()
 	ai.setup(1, gs, _balance)

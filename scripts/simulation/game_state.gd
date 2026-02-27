@@ -71,17 +71,14 @@ func initialize(map_data: Dictionary, scenario_data: Dictionary, balance: Dictio
 		if _cities.has(city_id):
 			_cities[city_id].owner_id = int(ownership[city_id_str])
 
-	# Create starting stacks
+	# Create starting stacks — one per unit type per entry
 	for stack_data in scenario_data.get("starting_stacks", []):
-		var stack := UnitStack.new()
-		stack.id = _next_stack_id
-		_next_stack_id += 1
-		stack.owner_id = int(stack_data["owner_id"])
-		stack.city_id = int(stack_data["city_id"])
-		stack.infantry_count = int(stack_data.get("infantry", 0))
-		stack.cavalry_count = int(stack_data.get("cavalry", 0))
-		stack.artillery_count = int(stack_data.get("artillery", 0))
-		_stacks[stack.id] = stack
+		var owner: int = int(stack_data["owner_id"])
+		var city: int = int(stack_data["city_id"])
+		for utype in ["infantry", "cavalry", "artillery"]:
+			var ucount: int = int(stack_data.get(utype, 0))
+			if ucount > 0:
+				_create_stack(owner, city, utype, ucount)
 
 	# Initialize per-player systems
 	for player_id in _player_ids:
@@ -115,6 +112,7 @@ func tick() -> void:
 	var delta: float = float(_balance.get("simulation", {}).get("tick_delta", 0.1))
 
 	_tick_movement(delta)
+	_auto_merge_stacks()
 	_auto_start_sieges()
 	_tick_sieges()
 	_tick_battles()
@@ -261,9 +259,6 @@ func _cmd_move(command: Dictionary) -> bool:
 func _cmd_split(command: Dictionary) -> bool:
 	var player_id: int = int(command["player_id"])
 	var stack_id: int = int(command["stack_id"])
-	var inf: int = int(command.get("infantry", 0))
-	var cav: int = int(command.get("cavalry", 0))
-	var art: int = int(command.get("artillery", 0))
 
 	if not _stacks.has(stack_id):
 		return false
@@ -274,15 +269,11 @@ func _cmd_split(command: Dictionary) -> bool:
 	if stack.is_moving:
 		return false
 
-	var cost: int = int(_balance.get("command", {}).get("order_costs", {}).get("split_stack", 1))
-	if not _command_system.can_afford(player_id, cost):
-		return false
-
-	var new_stack: UnitStack = stack.split(inf, cav, art)
+	# No order cost for split
+	var new_stack: UnitStack = stack.split_half()
 	if new_stack == null:
 		return false
 
-	_command_system.spend_order(player_id, cost)
 	new_stack.id = _next_stack_id
 	_next_stack_id += 1
 	_stacks[new_stack.id] = new_stack
@@ -358,6 +349,42 @@ func _cmd_capture_neutral(command: Dictionary) -> bool:
 
 
 # --- Tick Sub-steps ---
+
+func _auto_merge_stacks() -> void:
+	## Merge same-owner, same-type stacks colocated at the same city.
+	## Iterates deterministically by sorted stack ID.
+	var merged_ids: Dictionary = {}  # IDs of stacks absorbed into others
+
+	var sorted_ids: Array = _stacks.keys().duplicate()
+	sorted_ids.sort()
+
+	for i in range(sorted_ids.size()):
+		var id_a: int = sorted_ids[i]
+		if merged_ids.has(id_a):
+			continue
+		if not _stacks.has(id_a):
+			continue
+		var stack_a: UnitStack = _stacks[id_a]
+		if stack_a.is_moving or stack_a.is_empty():
+			continue
+
+		for j in range(i + 1, sorted_ids.size()):
+			var id_b: int = sorted_ids[j]
+			if merged_ids.has(id_b):
+				continue
+			if not _stacks.has(id_b):
+				continue
+			var stack_b: UnitStack = _stacks[id_b]
+			if stack_b.is_moving or stack_b.is_empty():
+				continue
+
+			if stack_a.owner_id == stack_b.owner_id and stack_a.city_id == stack_b.city_id and stack_a.unit_type == stack_b.unit_type:
+				stack_a.merge(stack_b)
+				merged_ids[id_b] = true
+
+	for mid in merged_ids:
+		_stacks.erase(mid)
+
 
 func _auto_start_sieges() -> void:
 	## Auto-start siege when enemy stacks are colocated at a city they don't own.
@@ -541,6 +568,18 @@ func _cleanup_empty_stacks() -> void:
 
 # --- Helpers ---
 
+func _create_stack(owner: int, city: int, utype: String, ucount: int) -> UnitStack:
+	var stack := UnitStack.new()
+	stack.id = _next_stack_id
+	_next_stack_id += 1
+	stack.owner_id = owner
+	stack.city_id = city
+	stack.unit_type = utype
+	stack.count = ucount
+	_stacks[stack.id] = stack
+	return stack
+
+
 func _get_owned_cities(player_id: int) -> Array:
 	var result: Array = []
 	for city_obj in _cities.values():
@@ -575,25 +614,17 @@ func _count_units_at_city(city_id: int) -> int:
 	return total
 
 
-func _add_produced_unit(city: City, unit_type: String) -> void:
+func _add_produced_unit(city: City, utype: String) -> void:
+	# Find existing same-type stack at this city
 	var stacks := _get_player_stacks_at_city(city.owner_id, city.id)
-	if not stacks.is_empty():
-		var stack: UnitStack = stacks[0]
-		match unit_type:
-			"infantry": stack.infantry_count += 1
-			"cavalry": stack.cavalry_count += 1
-			"artillery": stack.artillery_count += 1
-	else:
-		var stack := UnitStack.new()
-		stack.id = _next_stack_id
-		_next_stack_id += 1
-		stack.owner_id = city.owner_id
-		stack.city_id = city.id
-		match unit_type:
-			"infantry": stack.infantry_count = 1
-			"cavalry": stack.cavalry_count = 1
-			"artillery": stack.artillery_count = 1
-		_stacks[stack.id] = stack
+	for s in stacks:
+		var stack: UnitStack = s as UnitStack
+		if stack.unit_type == utype:
+			stack.count += 1
+			return
+
+	# No existing stack of this type — create a new one
+	_create_stack(city.owner_id, city.id, utype, 1)
 
 
 func _are_adjacent(city_a: int, city_b: int) -> bool:

@@ -23,7 +23,8 @@ func _make_city(tier: String = "hamlet", owner: int = 0) -> City:
 func _make_stack(units: int = 5, owner: int = 0) -> UnitStack:
 	var stack := UnitStack.new()
 	stack.owner_id = owner
-	stack.infantry_count = units
+	stack.unit_type = "infantry"
+	stack.count = units
 	return stack
 
 
