@@ -240,14 +240,25 @@ func _draw_cities() -> void:
 		draw_string(font, pos + Vector2(-name_size.x / 2, radius + 14),
 			city.city_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(1, 1, 1, name_alpha))
 
-		# Structure HP bar (only when damaged and visible)
-		if visible and city.structure_hp < city.max_structure_hp:
-			var bw: float = radius * 2.0
-			var bp := pos + Vector2(-radius, -radius - 8)
-			var pct: float = city.structure_hp / city.max_structure_hp
-			draw_rect(Rect2(bp, Vector2(bw, 4)), Color(0.2, 0.2, 0.2, 0.8))
-			var bar_color := Color(0.0, 0.8, 0.0, 0.8) if pct > 0.3 else Color(0.9, 0.2, 0.0, 0.8)
-			draw_rect(Rect2(bp, Vector2(bw * pct, 4)), bar_color)
+		# Structure HP bar — always shown for visible cities
+		if visible:
+			var bw: float = maxf(radius * 2.5, 30.0)
+			var bp := pos + Vector2(-bw / 2.0, -radius - 10)
+			var pct: float = city.structure_hp / city.max_structure_hp if city.max_structure_hp > 0 else 0.0
+			draw_rect(Rect2(bp, Vector2(bw, 5)), Color(0.2, 0.2, 0.2, 0.8))
+			var bar_color: Color
+			if pct > 0.6:
+				bar_color = Color(0.0, 0.8, 0.0, 0.8)
+			elif pct > 0.3:
+				bar_color = Color(0.9, 0.7, 0.0, 0.8)
+			else:
+				bar_color = Color(0.9, 0.2, 0.0, 0.8)
+			draw_rect(Rect2(bp, Vector2(bw * pct, 5)), bar_color)
+			# HP text above bar
+			var hp_text := "%d/%d" % [roundi(city.structure_hp), roundi(city.max_structure_hp)]
+			var hp_size := font.get_string_size(hp_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8)
+			draw_string(font, bp + Vector2((bw - hp_size.x) / 2.0, -2),
+				hp_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(1, 1, 1, 0.7))
 
 
 # --- Combat Indicators ---
