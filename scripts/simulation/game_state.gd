@@ -244,6 +244,10 @@ func _cmd_move(command: Dictionary) -> bool:
 	if not _are_adjacent(stack.city_id, target_city_id):
 		return false
 
+	# Cannot move out of a city where enemy stacks are present (pinning)
+	if _has_enemy_stacks_at_city(player_id, stack.city_id):
+		return false
+
 	var cost: int = int(_balance.get("command", {}).get("order_costs", {}).get("move_stack", 1))
 	if not _command_system.can_afford(player_id, cost):
 		return false
@@ -579,6 +583,15 @@ func _edge_key(a: int, b: int) -> int:
 	var lo := mini(a, b)
 	var hi := maxi(a, b)
 	return lo * 10000 + hi
+
+
+func _has_enemy_stacks_at_city(player_id: int, city_id: int) -> bool:
+	for stack_obj in _stacks.values():
+		var s: UnitStack = stack_obj as UnitStack
+		if s.owner_id != player_id and s.city_id == city_id and not s.is_moving:
+			if not s.is_empty():
+				return true
+	return false
 
 
 func _recalculate_commands_for_player(player_id: int) -> void:

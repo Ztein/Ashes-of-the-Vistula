@@ -487,6 +487,56 @@ func test_game_over_blocks_further_commands() -> void:
 	assert_false(success, "commands blocked after game over")
 
 
+# --- Movement blocked by enemy presence ---
+
+func test_move_blocked_when_enemy_stacks_present() -> void:
+	## Stacks cannot leave a city where enemy stacks are present.
+	var gs := _make_multi_siege_gs()  # P0 has 2 stacks at city 1 (enemy), P1 has 1 stack there
+	var p0_stacks := gs.get_stacks_at_city(0, 1)
+	assert_gte(p0_stacks.size(), 1, "P0 has stacks at city 1")
+	var sid: int = p0_stacks[0].id
+	# City 0 is adjacent to city 1. Try to move back.
+	var success := gs.submit_command({
+		"type": "move_stack", "player_id": 0,
+		"stack_id": sid, "target_city_id": 0,
+	})
+	assert_false(success, "move should be blocked by enemy presence")
+
+
+func test_move_allowed_without_enemy_stacks() -> void:
+	var gs := _make_simple_gs()
+	var sid: int = gs.get_stacks_at_city(0, 0)[0].id
+	# No enemies at city 0
+	var success := gs.submit_command({
+		"type": "move_stack", "player_id": 0,
+		"stack_id": sid, "target_city_id": 1,
+	})
+	assert_true(success, "move should succeed with no enemies at origin")
+
+
+func test_move_allowed_after_enemies_destroyed() -> void:
+	## Once enemies are eliminated, the stack should be free to move.
+	var gs := _make_multi_siege_gs()
+	# Start siege to eliminate P1 defenders
+	var p0_stacks := gs.get_stacks_at_city(0, 1)
+	gs.submit_command({"type": "start_siege", "player_id": 0, "stack_id": p0_stacks[0].id})
+	# Tick until battle resolves — P0 has 10 inf, P1 has 3 inf
+	for i in range(500):
+		gs.tick()
+		if gs.get_city(1).owner_id == 0:
+			break
+	assert_eq(gs.get_city(1).owner_id, 0, "P0 should have captured city 1")
+	# Now P0 stacks should be free to move
+	var remaining_stacks := gs.get_stacks_at_city(0, 1)
+	if not remaining_stacks.is_empty():
+		var sid: int = remaining_stacks[0].id
+		var success := gs.submit_command({
+			"type": "move_stack", "player_id": 0,
+			"stack_id": sid, "target_city_id": 0,
+		})
+		assert_true(success, "move should succeed after enemies destroyed")
+
+
 # --- Extended Determinism ---
 
 func test_determinism_100_tick_replay() -> void:
