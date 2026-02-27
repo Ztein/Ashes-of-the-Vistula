@@ -340,7 +340,20 @@ func _draw_moving_stack(stack: UnitStack) -> void:
 
 func _draw_stack_indicator(stack: UnitStack, pos: Vector2) -> void:
 	var color := _get_owner_color(stack.owner_id)
-	var size := Vector2(24, 16)
+	var font := ThemeDB.fallback_font
+
+	# Build composition text: "5I 3C 2A"
+	var parts: PackedStringArray = []
+	if stack.infantry_count > 0:
+		parts.append("%dI" % stack.infantry_count)
+	if stack.cavalry_count > 0:
+		parts.append("%dC" % stack.cavalry_count)
+	if stack.artillery_count > 0:
+		parts.append("%dA" % stack.artillery_count)
+	var comp_text := " ".join(parts) if not parts.is_empty() else "0"
+	var comp_width := font.get_string_size(comp_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+
+	var size := Vector2(maxf(comp_width + 8.0, 28.0), 16.0)
 	var rect := Rect2(pos - size / 2, size)
 
 	# Selection highlight
@@ -350,11 +363,8 @@ func _draw_stack_indicator(stack: UnitStack, pos: Vector2) -> void:
 	draw_rect(rect, Color(color.r, color.g, color.b, 0.85))
 	draw_rect(rect, Color.WHITE, false, 1.0)
 
-	# Unit count
-	var font := ThemeDB.fallback_font
-	var text := str(stack.total_units())
-	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-	draw_string(font, pos + Vector2(-tw / 2, 4), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color.WHITE)
+	# Draw composition text
+	draw_string(font, pos + Vector2(-comp_width / 2, 4), comp_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
 
 
 func _get_owner_color(owner_id: int) -> Color:
