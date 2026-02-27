@@ -15,6 +15,7 @@ var _balance: Dictionary = {}
 var _tick_timer: float = 0.0
 var _tick_count: int = 0
 var _camera_speed: float = 400.0
+var _map_bounds: Rect2 = Rect2()  # Bounding box of all cities (with padding)
 
 @onready var _hex_map: Node2D = $HexMap
 @onready var _camera: Camera2D = $Camera2D
@@ -75,8 +76,8 @@ func _init_game() -> void:
 	_selected_city_id = -1
 	_selected_stack_id = -1
 
-	# Center camera roughly on the map
-	_camera.position = Vector2(640, 480)
+	# Fit camera to show all cities
+	_fit_camera_to_map()
 	_hex_map.queue_redraw()
 
 
@@ -112,6 +113,39 @@ func _tick_simulation(delta: float) -> void:
 		_update_hud()
 
 
+func _fit_camera_to_map() -> void:
+	## Compute bounding box of all cities and center/zoom camera to fit.
+	var cities := _game_state.get_all_cities()
+	if cities.is_empty():
+		_camera.position = Vector2(640, 480)
+		return
+
+	var min_pos := Vector2(INF, INF)
+	var max_pos := Vector2(-INF, -INF)
+	for city in cities:
+		var pixel_pos := _hex_map.get_city_pixel_pos(city.id)
+		min_pos.x = minf(min_pos.x, pixel_pos.x)
+		min_pos.y = minf(min_pos.y, pixel_pos.y)
+		max_pos.x = maxf(max_pos.x, pixel_pos.x)
+		max_pos.y = maxf(max_pos.y, pixel_pos.y)
+
+	var padding := 100.0
+	min_pos -= Vector2(padding, padding)
+	max_pos += Vector2(padding, padding)
+	_map_bounds = Rect2(min_pos, max_pos - min_pos)
+
+	# Center camera on the map
+	_camera.position = _map_bounds.get_center()
+
+	# Zoom to fit all cities in the viewport
+	var viewport_size := get_viewport_rect().size
+	var zoom_x: float = viewport_size.x / _map_bounds.size.x
+	var zoom_y: float = viewport_size.y / _map_bounds.size.y
+	var fit_zoom: float = minf(zoom_x, zoom_y)
+	fit_zoom = clampf(fit_zoom, 0.3, 3.0)
+	_camera.zoom = Vector2(fit_zoom, fit_zoom)
+
+
 func _handle_camera(delta: float) -> void:
 	var move := Vector2.ZERO
 	if Input.is_action_pressed("ui_left") or Input.is_key_pressed(KEY_A):
@@ -125,6 +159,11 @@ func _handle_camera(delta: float) -> void:
 
 	if move != Vector2.ZERO:
 		_camera.position += move.normalized() * _camera_speed * delta
+
+	# Clamp camera to map bounds
+	if _map_bounds.size.length() > 0:
+		_camera.position.x = clampf(_camera.position.x, _map_bounds.position.x, _map_bounds.end.x)
+		_camera.position.y = clampf(_camera.position.y, _map_bounds.position.y, _map_bounds.end.y)
 
 
 func _unhandled_input(event: InputEvent) -> void:

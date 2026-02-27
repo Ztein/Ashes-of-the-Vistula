@@ -173,7 +173,16 @@ func _draw_fog_background() -> void:
 		return
 	# Draw a dim overlay over the entire map area, then territory/visibility
 	# will be drawn on top. This creates fog effect for unseen areas.
-	var map_rect := Rect2(-HEX_SCALE, -HEX_SCALE, 22.0 * HEX_SCALE, 18.0 * HEX_SCALE)
+	# Compute fog rect from actual city positions
+	var min_pos := Vector2(INF, INF)
+	var max_pos := Vector2(-INF, -INF)
+	for pos in _city_positions.values():
+		min_pos.x = minf(min_pos.x, pos.x)
+		min_pos.y = minf(min_pos.y, pos.y)
+		max_pos.x = maxf(max_pos.x, pos.x)
+		max_pos.y = maxf(max_pos.y, pos.y)
+	var pad := HEX_SCALE * 2.0
+	var map_rect := Rect2(min_pos.x - pad, min_pos.y - pad, max_pos.x - min_pos.x + pad * 2, max_pos.y - min_pos.y + pad * 2)
 	draw_rect(map_rect, Color(0.0, 0.0, 0.0, 0.3))
 
 
