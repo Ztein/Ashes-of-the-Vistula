@@ -18,12 +18,12 @@ Final integration pass. Main menu, victory/defeat screens, clean game restart, p
 - Remove TODO comments and temporary code
 
 ## Acceptance Criteria
-- [ ] Game launches from main menu
-- [ ] Full match against AI with all systems
-- [ ] Victory screen on player win
-- [ ] Defeat screen on AI win
-- [ ] Restartable without app restart
-- [ ] All tests pass
-- [ ] No hardcoded gameplay values
-- [ ] ~15-20 minute match length
-- [ ] Smooth performance
+- [x] Game launches from main menu
+- [x] Full match against AI with all systems
+- [x] Victory screen on player win
+- [x] Defeat screen on AI win
+- [x] Restartable without app restart
+- [x] All tests pass
+- [x] No hardcoded gameplay values
+- [x] ~15-20 minute match length
+- [x] Smooth performance

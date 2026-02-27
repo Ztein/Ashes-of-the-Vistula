@@ -15,11 +15,11 @@ Runtime balance tuning panel. F12 toggle. All balance.json values editable. Relo
 - All parameters from balance.json editable via sliders/inputs
 
 ## Acceptance Criteria
-- [ ] F12 toggles panel
-- [ ] All balance values editable
-- [ ] Reload JSON from disk works
-- [ ] Apply changes pushes to simulation
-- [ ] Export writes current values to balance.json
-- [ ] Reset match reinitializes game state
-- [ ] Derived state shown accurately
-- [ ] Panel does not block gameplay when hidden
+- [x] F12 toggles panel
+- [x] All balance values editable
+- [x] Reload JSON from disk works
+- [x] Apply changes pushes to simulation
+- [x] Export writes current values to balance.json
+- [x] Reset match reinitializes game state
+- [x] Derived state shown accurately
+- [x] Panel does not block gameplay when hidden

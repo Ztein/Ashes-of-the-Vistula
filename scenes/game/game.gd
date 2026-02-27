@@ -1,6 +1,6 @@
 extends Node2D
 ## Main game controller. Wires simulation to presentation.
-## Handles: tick timer, camera, player input, command translation.
+## Handles: tick timer, camera, player input, command translation, AI, admin panel.
 
 const PLAYER_ID: int = 0  # Human player
 const AI_PLAYER_ID: int = 1
@@ -20,6 +20,8 @@ var _camera_speed: float = 400.0
 @onready var _camera: Camera2D = $Camera2D
 @onready var _stack_info: PanelContainer = $UILayer/StackInfo
 @onready var _hud: Control = $UILayer/HUD
+@onready var _admin_panel: PanelContainer = $UILayer/AdminPanel
+@onready var _game_over_overlay: PanelContainer = $UILayer/GameOverOverlay
 
 
 func _ready() -> void:
@@ -31,6 +33,18 @@ func _ready() -> void:
 		push_error("Game: failed to load data files")
 		return
 
+	_init_game()
+
+	# Admin panel signals
+	_admin_panel.reset_requested.connect(_on_reset_requested)
+	_admin_panel.balance_changed.connect(_on_balance_changed)
+
+	# Game over overlay signals
+	_game_over_overlay.restart_requested.connect(_on_reset_requested)
+	_game_over_overlay.menu_requested.connect(_on_menu_requested)
+
+
+func _init_game() -> void:
 	_game_state = GameState.new()
 	_game_state.initialize(_map_data, _scenario_data, _balance)
 
@@ -45,21 +59,39 @@ func _ready() -> void:
 	_game_state.stack_arrived.connect(_on_stack_arrived)
 
 	_stack_info.visible = false
+	_game_over_overlay.visible = false
 
 	# Initialize AI opponent
 	_ai = AIController.new()
 	_ai.setup(AI_PLAYER_ID, _game_state, _balance)
 
+	# Admin panel setup
+	_admin_panel.setup(_balance, _game_state)
+	_admin_panel.visible = false
+
+	# Reset tick state
+	_tick_timer = 0.0
+	_tick_count = 0
+	_selected_city_id = -1
+	_selected_stack_id = -1
+
 	# Center camera roughly on the map
 	_camera.position = Vector2(640, 480)
+	_hex_map.queue_redraw()
 
 
 func _process(delta: float) -> void:
-	if _game_state == null or _game_state.is_game_over():
+	if _game_state == null:
 		return
 
 	_handle_camera(delta)
-	_tick_simulation(delta)
+
+	if not _game_state.is_game_over():
+		_tick_simulation(delta)
+
+	# Update admin panel state display every frame if visible
+	if _admin_panel.visible:
+		_admin_panel.update_state_display()
 
 
 func _tick_simulation(delta: float) -> void:
@@ -111,6 +143,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Keyboard commands
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
+			KEY_F12:
+				_admin_panel.visible = not _admin_panel.visible
 			KEY_F:
 				_try_siege()
 			KEY_G:
@@ -130,7 +164,7 @@ var _selected_stack_id: int = -1
 
 
 func _on_city_clicked(city_id: int) -> void:
-	if _game_state == null:
+	if _game_state == null or _game_state.is_game_over():
 		return
 
 	# If a stack is selected and we click a different adjacent city, issue move
@@ -189,7 +223,7 @@ func _cycle_stack_at_city() -> void:
 # --- Commands ---
 
 func _try_siege() -> void:
-	if _selected_stack_id < 0:
+	if _selected_stack_id < 0 or _game_state.is_game_over():
 		return
 	_game_state.submit_command({
 		"type": "start_siege",
@@ -200,7 +234,7 @@ func _try_siege() -> void:
 
 
 func _try_capture_neutral() -> void:
-	if _selected_stack_id < 0:
+	if _selected_stack_id < 0 or _game_state.is_game_over():
 		return
 	_game_state.submit_command({
 		"type": "capture_neutral",
@@ -211,12 +245,11 @@ func _try_capture_neutral() -> void:
 
 
 func _try_split() -> void:
-	if _selected_stack_id < 0:
+	if _selected_stack_id < 0 or _game_state.is_game_over():
 		return
 	var stack := _game_state.get_stack(_selected_stack_id)
 	if stack == null:
 		return
-	# Default split: take half infantry (rounded down)
 	var inf_split: int = stack.infantry_count / 2
 	var cav_split: int = stack.cavalry_count / 2
 	var art_split: int = stack.artillery_count / 2
@@ -259,25 +292,25 @@ func _update_hud() -> void:
 
 # --- Signal Handlers ---
 
-func _on_city_captured(city_id: int, new_owner: int) -> void:
+func _on_city_captured(_city_id: int, _new_owner: int) -> void:
 	_hex_map.queue_redraw()
 
 
-func _on_siege_started(city_id: int, _attacker: int) -> void:
+func _on_siege_started(_city_id: int, _attacker: int) -> void:
 	_hex_map.queue_redraw()
 
 
-func _on_battle_started(city_id: int) -> void:
+func _on_battle_started(_city_id: int) -> void:
 	_hex_map.queue_redraw()
 
 
 func _on_victory(winner_id: int) -> void:
-	var player_name: String = "Unknown"
-	for player in _scenario_data.get("players", []):
-		if int(player["id"]) == winner_id:
-			player_name = player.get("name", "Player %d" % winner_id)
-			break
-	print("VICTORY: %s wins!" % player_name)
+	_hex_map.queue_redraw()
+	_update_hud()
+	if winner_id == PLAYER_ID:
+		_game_over_overlay.show_victory()
+	else:
+		_game_over_overlay.show_defeat()
 
 
 func _on_production_completed(_city_id: int, _unit_type: String) -> void:
@@ -286,3 +319,40 @@ func _on_production_completed(_city_id: int, _unit_type: String) -> void:
 
 func _on_stack_arrived(_stack_id: int, _city_id: int) -> void:
 	_hex_map.queue_redraw()
+
+
+# --- Admin/Reset ---
+
+func _on_reset_requested() -> void:
+	_game_over_overlay.visible = false
+	# Disconnect old signals
+	if _game_state != null:
+		if _game_state.city_captured.is_connected(_on_city_captured):
+			_game_state.city_captured.disconnect(_on_city_captured)
+		if _game_state.siege_started.is_connected(_on_siege_started):
+			_game_state.siege_started.disconnect(_on_siege_started)
+		if _game_state.battle_started.is_connected(_on_battle_started):
+			_game_state.battle_started.disconnect(_on_battle_started)
+		if _game_state.victory_achieved.is_connected(_on_victory):
+			_game_state.victory_achieved.disconnect(_on_victory)
+		if _game_state.production_completed.is_connected(_on_production_completed):
+			_game_state.production_completed.disconnect(_on_production_completed)
+		if _game_state.stack_arrived.is_connected(_on_stack_arrived):
+			_game_state.stack_arrived.disconnect(_on_stack_arrived)
+	if _hex_map.city_clicked.is_connected(_on_city_clicked):
+		_hex_map.city_clicked.disconnect(_on_city_clicked)
+
+	# Clear hex map children (click areas)
+	for child in _hex_map.get_children():
+		child.queue_free()
+
+	_init_game()
+
+
+func _on_balance_changed(new_balance: Dictionary) -> void:
+	_balance = new_balance
+	_on_reset_requested()
+
+
+func _on_menu_requested() -> void:
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
