@@ -3,6 +3,8 @@ extends Node2D
 ## combat indicators (siege/battle), and fog of war.
 
 signal city_clicked(city_id: int)
+signal stack_double_clicked(city_id: int)
+signal right_clicked()
 
 const HEX_SCALE: float = 64.0
 const CITY_SIZES := {"hamlet": 12.0, "village": 18.0, "major_city": 24.0}
@@ -65,8 +67,14 @@ func _create_city_click_areas() -> void:
 
 
 func _on_area_input(_viewport: Node, event: InputEvent, _shape_idx: int, city_id: int) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		city_clicked.emit(city_id)
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.double_click:
+				stack_double_clicked.emit(city_id)
+			else:
+				city_clicked.emit(city_id)
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			right_clicked.emit()
 
 
 func _draw() -> void:
@@ -374,15 +382,9 @@ func _draw_stack_indicator(stack: UnitStack, pos: Vector2) -> void:
 	var color := _get_owner_color(stack.owner_id)
 	var font := ThemeDB.fallback_font
 
-	# Build composition text: "5I 3C 2A"
-	var parts: PackedStringArray = []
-	if stack.infantry_count > 0:
-		parts.append("%dI" % stack.infantry_count)
-	if stack.cavalry_count > 0:
-		parts.append("%dC" % stack.cavalry_count)
-	if stack.artillery_count > 0:
-		parts.append("%dA" % stack.artillery_count)
-	var comp_text := " ".join(parts) if not parts.is_empty() else "0"
+	# Build label: "5I", "3C", or "2A"
+	var type_letter: String = stack.unit_type.substr(0, 1).to_upper()
+	var comp_text := "%d%s" % [stack.count, type_letter]
 	var comp_width := font.get_string_size(comp_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
 
 	var size := Vector2(maxf(comp_width + 8.0, 28.0), 16.0)

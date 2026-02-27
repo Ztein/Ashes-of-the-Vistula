@@ -59,6 +59,8 @@ func _init_game() -> void:
 
 	_hex_map.setup(_game_state, _map_data, _scenario_data)
 	_hex_map.city_clicked.connect(_on_city_clicked)
+	_hex_map.stack_double_clicked.connect(_on_stack_double_clicked)
+	_hex_map.right_clicked.connect(_on_right_clicked)
 
 	_game_state.city_captured.connect(_on_city_captured)
 	_game_state.siege_started.connect(_on_siege_started)
@@ -178,14 +180,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _game_state == null:
 		return
 
-	# Scroll zoom
-	if event is InputEventMouseButton:
-		var new_zoom: float = _camera.zoom.x
+	# Mouse input
+	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			new_zoom = clampf(_camera.zoom.x * 1.1, 0.3, 3.0)
+			_camera.zoom = Vector2.ONE * clampf(_camera.zoom.x * 1.1, 0.3, 3.0)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			new_zoom = clampf(_camera.zoom.x * 0.9, 0.3, 3.0)
-		_camera.zoom = Vector2(new_zoom, new_zoom)
+			_camera.zoom = Vector2.ONE * clampf(_camera.zoom.x * 0.9, 0.3, 3.0)
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			_deselect_all()
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			# Click on empty space (not on a city) — deselect
+			_deselect_all()
 
 	# Keyboard commands
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -229,6 +234,30 @@ func _on_city_clicked(city_id: int) -> void:
 				_hex_map.queue_redraw()
 				return
 
+	# Clicking the same city — cycle through stacks or toggle deselect
+	if city_id == _selected_city_id and _selected_stack_id >= 0:
+		var stacks := _game_state.get_stacks_at_city(PLAYER_ID, city_id)
+		if stacks.size() > 1:
+			# Find current stack index and cycle to next
+			var current_idx: int = -1
+			for i in range(stacks.size()):
+				if (stacks[i] as UnitStack).id == _selected_stack_id:
+					current_idx = i
+					break
+			var next_idx: int = (current_idx + 1) % stacks.size()
+			if next_idx == 0 and current_idx >= 0:
+				# Cycled back to first — deselect
+				_deselect_all()
+			else:
+				_selected_stack_id = (stacks[next_idx] as UnitStack).id
+				_hex_map.set_selection(_selected_city_id, _selected_stack_id)
+				_hex_map.queue_redraw()
+				_update_stack_info()
+		else:
+			# Only one stack — clicking again deselects
+			_deselect_all()
+		return
+
 	# Select the city and the first player stack there
 	_selected_city_id = city_id
 	_selected_stack_id = -1
@@ -240,6 +269,18 @@ func _on_city_clicked(city_id: int) -> void:
 	_hex_map.set_selection(_selected_city_id, _selected_stack_id)
 	_hex_map.queue_redraw()
 	_update_stack_info()
+
+
+func _on_stack_double_clicked(city_id: int) -> void:
+	if _game_state == null or _game_state.is_game_over() or _paused:
+		return
+	# Double-click on a city halves the currently selected stack
+	if _selected_stack_id >= 0 and _selected_city_id == city_id:
+		_try_split()
+
+
+func _on_right_clicked() -> void:
+	_deselect_all()
 
 
 func _deselect_all() -> void:
@@ -295,20 +336,12 @@ func _try_split() -> void:
 	if _selected_stack_id < 0 or _game_state.is_game_over():
 		return
 	var stack := _game_state.get_stack(_selected_stack_id)
-	if stack == null:
-		return
-	var inf_split: int = stack.infantry_count / 2
-	var cav_split: int = stack.cavalry_count / 2
-	var art_split: int = stack.artillery_count / 2
-	if inf_split + cav_split + art_split <= 0:
+	if stack == null or stack.count <= 1:
 		return
 	_game_state.submit_command({
 		"type": "split_stack",
 		"player_id": PLAYER_ID,
 		"stack_id": _selected_stack_id,
-		"infantry": inf_split,
-		"cavalry": cav_split,
-		"artillery": art_split,
 	})
 	_hex_map.queue_redraw()
 	_update_stack_info()
@@ -390,6 +423,10 @@ func _on_reset_requested() -> void:
 			_game_state.stack_arrived.disconnect(_on_stack_arrived)
 	if _hex_map.city_clicked.is_connected(_on_city_clicked):
 		_hex_map.city_clicked.disconnect(_on_city_clicked)
+	if _hex_map.stack_double_clicked.is_connected(_on_stack_double_clicked):
+		_hex_map.stack_double_clicked.disconnect(_on_stack_double_clicked)
+	if _hex_map.right_clicked.is_connected(_on_right_clicked):
+		_hex_map.right_clicked.disconnect(_on_right_clicked)
 
 	# Clear hex map children (click areas)
 	for child in _hex_map.get_children():
