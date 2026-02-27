@@ -188,6 +188,36 @@ func get_tick_count() -> int:
 	return _tick_count
 
 
+func is_city_under_siege(city_id: int) -> bool:
+	return _sieges.has(city_id)
+
+
+func is_city_in_battle(city_id: int) -> bool:
+	return _battles.has(city_id)
+
+
+func get_siege_attacker(city_id: int) -> int:
+	if _sieges.has(city_id):
+		return int(_sieges[city_id]["attacker_id"])
+	return -1
+
+
+func get_dominance_info(player_id: int) -> Dictionary:
+	return _dominance_system.get_info(player_id)
+
+
+func get_total_city_count() -> int:
+	return _cities.size()
+
+
+func count_owned_cities(player_id: int) -> int:
+	return _count_owned_cities(player_id)
+
+
+func get_total_hex_count() -> int:
+	return _total_hex_count
+
+
 # --- Command Processing ---
 
 func _cmd_move(command: Dictionary) -> bool:

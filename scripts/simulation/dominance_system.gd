@@ -61,5 +61,15 @@ func tick(player_id: int, delta: float, owned_city_count: int, total_cities: int
 	}
 
 
+func get_info(player_id: int) -> Dictionary:
+	if not _player_data.has(player_id):
+		return {"is_dominant": false, "timer_remaining": 0.0}
+	var data: Dictionary = _player_data[player_id]
+	return {
+		"is_dominant": bool(data["is_dominant"]),
+		"timer_remaining": float(data["timer_remaining"]),
+	}
+
+
 func reset_player(player_id: int, balance: Dictionary) -> void:
 	initialize_player(player_id, balance)
