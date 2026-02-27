@@ -264,24 +264,56 @@ func _draw_cities() -> void:
 # --- Combat Indicators ---
 
 func _draw_combat_indicators() -> void:
+	var font := ThemeDB.fallback_font
 	for city in _game_state.get_all_cities():
+		if not _is_city_visible(city.id):
+			continue
 		var pos: Vector2 = _city_positions[city.id]
 		var radius: float = CITY_SIZES.get(city.tier, 12.0)
 
 		if _game_state.is_city_in_battle(city.id):
-			# Battle: red pulsing ring
+			# Battle: red pulsing ring with attacker color tint
 			var pulse: float = 0.5 + 0.5 * sin(_elapsed * 6.0)
-			var battle_color := Color(1.0, 0.2, 0.0, 0.5 + pulse * 0.5)
-			draw_arc(pos, radius + 6.0, 0, TAU, 32, battle_color, 3.0)
-			# Crossed swords indicator (text-based)
-			var font := ThemeDB.fallback_font
-			draw_string(font, pos + Vector2(-6, -radius - 12), "X", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.RED)
+			var attacker_id: int = _game_state.get_siege_attacker(city.id)
+			var attacker_color := _get_owner_color(attacker_id)
+			var battle_color := Color(
+				lerpf(1.0, attacker_color.r, 0.3),
+				lerpf(0.2, attacker_color.g, 0.3),
+				lerpf(0.0, attacker_color.b, 0.3),
+				0.5 + pulse * 0.5
+			)
+			draw_arc(pos, radius + 6.0, 0, TAU, 32, battle_color, 3.5)
+			# Second inner ring for emphasis
+			draw_arc(pos, radius + 3.0, 0, TAU, 32, Color(1.0, 0.1, 0.0, 0.3 + pulse * 0.3), 2.0)
+			# "BATTLE" label
+			var label := "BATTLE"
+			var label_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9)
+			var label_pos := pos + Vector2(-label_size.x / 2.0, -radius - 18)
+			draw_rect(Rect2(label_pos + Vector2(-2, -9), Vector2(label_size.x + 4, 12)), Color(0.0, 0.0, 0.0, 0.6))
+			draw_string(font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1.0, 0.3, 0.3))
 
 		elif _game_state.is_city_under_siege(city.id):
-			# Siege: orange pulsing ring
+			# Siege: orange pulsing ring with attacker color tint
 			var pulse: float = 0.5 + 0.5 * sin(_elapsed * 3.0)
-			var siege_color := Color(1.0, 0.6, 0.0, 0.3 + pulse * 0.4)
+			var attacker_id: int = _game_state.get_siege_attacker(city.id)
+			var attacker_color := _get_owner_color(attacker_id)
+			var siege_color := Color(
+				lerpf(1.0, attacker_color.r, 0.3),
+				lerpf(0.6, attacker_color.g, 0.3),
+				lerpf(0.0, attacker_color.b, 0.3),
+				0.3 + pulse * 0.4
+			)
 			draw_arc(pos, radius + 5.0, 0, TAU, 32, siege_color, 2.5)
+			# Siege progress arc — shows how much structure HP remains
+			var pct: float = city.structure_hp / city.max_structure_hp if city.max_structure_hp > 0 else 1.0
+			var progress_color := Color(1.0, 0.6, 0.0, 0.7)
+			draw_arc(pos, radius + 8.0, -PI / 2.0, -PI / 2.0 + TAU * (1.0 - pct), 32, progress_color, 2.0)
+			# "SIEGE" label
+			var label := "SIEGE"
+			var label_size := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9)
+			var label_pos := pos + Vector2(-label_size.x / 2.0, -radius - 18)
+			draw_rect(Rect2(label_pos + Vector2(-2, -9), Vector2(label_size.x + 4, 12)), Color(0.0, 0.0, 0.0, 0.6))
+			draw_string(font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1.0, 0.7, 0.3))
 
 
 func _draw_selection_highlight() -> void:
