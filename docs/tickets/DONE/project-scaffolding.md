@@ -23,5 +23,5 @@ Create the Godot 4 project file, complete directory structure, .gitignore, all t
 - [x] config_loader.gd loads and validates JSON files
 - [x] test_runner.gd discovers and runs tests headless
 - [x] test_config_loading.gd passes all tests
-- [ ] godot --path . --headless -s tests/test_runner.gd exits with code 0
-- [ ] All 18 tickets created in docs/tickets/
+- [x] godot --path . --headless -s tests/test_runner.gd exits with code 0
+- [x] All 18 tickets created in docs/tickets/
