@@ -1,0 +1,26 @@
+# Godot 4 import cache
+.godot/
+
+# Godot import files
+*.import
+
+# Build outputs
+builds/
+export_presets.cfg
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# IDE
+.vscode/
+*.swp
+*.swo
+
+# Example file (not part of project)
+example_of_CLAUDE.md

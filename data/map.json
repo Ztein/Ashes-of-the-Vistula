@@ -1,0 +1,140 @@
+{
+  "hex_size": 64,
+  "total_hex_count": 200,
+  "cities": [
+    {
+      "id": 0,
+      "name": "Warszawa",
+      "tier": "major_city",
+      "production_type": "infantry",
+      "hex_position": [10, 7]
+    },
+    {
+      "id": 1,
+      "name": "Krakow",
+      "tier": "major_city",
+      "production_type": "cavalry",
+      "hex_position": [8, 14]
+    },
+    {
+      "id": 2,
+      "name": "Gdansk",
+      "tier": "major_city",
+      "production_type": "artillery",
+      "hex_position": [8, 1]
+    },
+    {
+      "id": 3,
+      "name": "Poznan",
+      "tier": "village",
+      "production_type": "infantry",
+      "hex_position": [4, 5]
+    },
+    {
+      "id": 4,
+      "name": "Lublin",
+      "tier": "village",
+      "production_type": "cavalry",
+      "hex_position": [14, 10]
+    },
+    {
+      "id": 5,
+      "name": "Lwow",
+      "tier": "village",
+      "production_type": "infantry",
+      "hex_position": [16, 14]
+    },
+    {
+      "id": 6,
+      "name": "Wroclaw",
+      "tier": "village",
+      "production_type": "artillery",
+      "hex_position": [3, 11]
+    },
+    {
+      "id": 7,
+      "name": "Torun",
+      "tier": "hamlet",
+      "production_type": "infantry",
+      "hex_position": [7, 4]
+    },
+    {
+      "id": 8,
+      "name": "Sandomierz",
+      "tier": "hamlet",
+      "production_type": "cavalry",
+      "hex_position": [12, 12]
+    },
+    {
+      "id": 9,
+      "name": "Zamosc",
+      "tier": "hamlet",
+      "production_type": "infantry",
+      "hex_position": [15, 12]
+    },
+    {
+      "id": 10,
+      "name": "Kielce",
+      "tier": "hamlet",
+      "production_type": "infantry",
+      "hex_position": [9, 11]
+    },
+    {
+      "id": 11,
+      "name": "Brest",
+      "tier": "hamlet",
+      "production_type": "cavalry",
+      "hex_position": [17, 7]
+    },
+    {
+      "id": 12,
+      "name": "Radom",
+      "tier": "hamlet",
+      "production_type": "infantry",
+      "hex_position": [11, 9]
+    },
+    {
+      "id": 13,
+      "name": "Plock",
+      "tier": "hamlet",
+      "production_type": "artillery",
+      "hex_position": [7, 7]
+    },
+    {
+      "id": 14,
+      "name": "Czestochowa",
+      "tier": "hamlet",
+      "production_type": "infantry",
+      "hex_position": [5, 12]
+    }
+  ],
+  "adjacency": [
+    [0, 7],
+    [0, 12],
+    [0, 13],
+    [0, 11],
+    [1, 8],
+    [1, 10],
+    [1, 14],
+    [2, 7],
+    [2, 3],
+    [3, 7],
+    [3, 13],
+    [3, 6],
+    [4, 12],
+    [4, 8],
+    [4, 9],
+    [4, 11],
+    [5, 9],
+    [5, 8],
+    [6, 14],
+    [6, 10],
+    [7, 13],
+    [8, 10],
+    [8, 9],
+    [9, 11],
+    [10, 12],
+    [10, 14],
+    [12, 13]
+  ]
+}

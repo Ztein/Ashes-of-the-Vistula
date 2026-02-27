@@ -1,0 +1,78 @@
+{
+  "units": {
+    "infantry": {
+      "hp": 100,
+      "dps": 10,
+      "siege_damage": 5,
+      "speed": 1.0,
+      "production_time": 5.0
+    },
+    "cavalry": {
+      "hp": 80,
+      "dps": 15,
+      "siege_damage": 2,
+      "speed": 1.5,
+      "production_time": 7.0
+    },
+    "artillery": {
+      "hp": 60,
+      "dps": 5,
+      "siege_damage": 20,
+      "speed": 0.6,
+      "production_time": 10.0
+    }
+  },
+  "cities": {
+    "hamlet": {
+      "local_cap": 5,
+      "structure_hp": 100,
+      "production_interval": 8.0,
+      "structure_regen_rate": 2.0
+    },
+    "village": {
+      "local_cap": 10,
+      "structure_hp": 200,
+      "production_interval": 6.0,
+      "structure_regen_rate": 3.0
+    },
+    "major_city": {
+      "local_cap": 20,
+      "structure_hp": 400,
+      "production_interval": 4.0,
+      "structure_regen_rate": 5.0
+    }
+  },
+  "supply": {
+    "base_cap": 20,
+    "per_territory_hex": 0.5,
+    "per_major_city": 5,
+    "per_minor_city": 2
+  },
+  "command": {
+    "base_order_cap": 3,
+    "base_regen_rate": 0.1,
+    "major_city_cap_bonus": 1,
+    "major_city_regen_bonus": 0.05,
+    "order_costs": {
+      "move_stack": 1,
+      "split_stack": 1,
+      "start_siege": 1,
+      "capture_neutral": 1
+    }
+  },
+  "dominance": {
+    "city_threshold_pct": 60,
+    "territory_threshold_pct": 50,
+    "timer_duration": 120.0
+  },
+  "simulation": {
+    "tick_rate": 10,
+    "tick_delta": 0.1
+  },
+  "ai": {
+    "evaluation_interval_ticks": 10,
+    "aggression": 0.6,
+    "defense_priority": 0.8,
+    "territory_value_weight": 0.7
+  }
+}

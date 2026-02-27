@@ -1,0 +1,64 @@
+{
+  "name": "The Deluge",
+  "description": "Poland vs Sweden, 1655. The Swedish invasion threatens the Polish-Lithuanian Commonwealth.",
+  "players": [
+    {
+      "id": 0,
+      "name": "Poland",
+      "color": [0.8, 0.1, 0.1, 1.0]
+    },
+    {
+      "id": 1,
+      "name": "Sweden",
+      "color": [0.1, 0.3, 0.8, 1.0]
+    }
+  ],
+  "city_ownership": {
+    "0": 0,
+    "1": 0,
+    "2": 1,
+    "3": 1,
+    "4": 0,
+    "5": 0,
+    "6": 1,
+    "7": 1,
+    "8": 0,
+    "9": 0,
+    "10": -1,
+    "11": 0,
+    "12": 1,
+    "13": 1,
+    "14": 1
+  },
+  "starting_stacks": [
+    {
+      "owner_id": 0,
+      "city_id": 0,
+      "infantry": 5,
+      "cavalry": 3,
+      "artillery": 1
+    },
+    {
+      "owner_id": 0,
+      "city_id": 1,
+      "infantry": 4,
+      "cavalry": 2,
+      "artillery": 1
+    },
+    {
+      "owner_id": 1,
+      "city_id": 2,
+      "infantry": 5,
+      "cavalry": 3,
+      "artillery": 1
+    },
+    {
+      "owner_id": 1,
+      "city_id": 3,
+      "infantry": 4,
+      "cavalry": 2,
+      "artillery": 1
+    }
+  ],
+  "victory_overrides": {}
+}
