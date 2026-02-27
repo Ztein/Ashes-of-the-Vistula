@@ -22,9 +22,15 @@ There is currently no visual feedback when siege or battle is happening at a cit
 - game_state.gd (expose active siege/battle state for presentation layer)
 - Possibly new combat indicator nodes in city_node.tscn
 
+## Implementation
+Enhanced `_draw_combat_indicators()` in `hex_map.gd`:
+- **Siege:** Orange pulsing ring (3 Hz) with attacker color tint, progress arc showing structure HP drain, "SIEGE" text label with dark background
+- **Battle:** Red pulsing double ring (6 Hz) with attacker color tint, "BATTLE" text label with dark background
+- Both indicators only show for visible cities (fog of war respected)
+
 ## Acceptance Criteria
-- [ ] Cities under active siege have a clear visual indicator
-- [ ] Battle phase is visually distinguishable from siege phase
-- [ ] Indicators appear/disappear correctly as combat starts/ends
-- [ ] Visual is readable at a glance without selecting the city
-- [ ] No simulation code changes needed (presentation layer only, reads from existing state)
+- [x] Cities under active siege have a clear visual indicator
+- [x] Battle phase is visually distinguishable from siege phase
+- [x] Indicators appear/disappear correctly as combat starts/ends
+- [x] Visual is readable at a glance without selecting the city
+- [x] No simulation code changes needed (presentation layer only, reads from existing state)

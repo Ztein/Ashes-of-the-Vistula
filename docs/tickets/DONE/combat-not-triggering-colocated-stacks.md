@@ -25,10 +25,16 @@ The current design requires an explicit `START_SIEGE` command to initiate combat
 - combat_resolver.gd (siege/battle triggering)
 - ai_controller.gd (siege command issuance)
 
+## Root Cause
+The tick loop only processed sieges for cities in the `_sieges` dictionary, which was only populated by explicit `START_SIEGE` commands. Combined with the pinning rule (can't move away with enemies present), this created a deadlock.
+
+## Fix
+Added `_auto_start_sieges()` method to tick loop between movement and siege phases. It scans all cities for colocated enemy stacks and auto-starts sieges with no order cost.
+
 ## Acceptance Criteria
-- [ ] Diagnose root cause: determine why combat isn't happening at colocated cities
-- [ ] Fix the issue so that opposing stacks at the same city engage in combat
-- [ ] AI reliably sieges enemy cities where it has stacks
-- [ ] Player can initiate siege against enemy cities with their stacks
-- [ ] Unit tests cover the fix
-- [ ] Integration test: stack arrives at enemy city → siege begins → battle resolves
+- [x] Diagnose root cause: determine why combat isn't happening at colocated cities
+- [x] Fix the issue so that opposing stacks at the same city engage in combat
+- [x] AI reliably sieges enemy cities where it has stacks
+- [x] Player can initiate siege against enemy cities with their stacks
+- [x] Unit tests cover the fix
+- [x] Integration test: stack arrives at enemy city → siege begins → battle resolves
