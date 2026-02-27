@@ -173,7 +173,16 @@ func _draw_fog_background() -> void:
 		return
 	# Draw a dim overlay over the entire map area, then territory/visibility
 	# will be drawn on top. This creates fog effect for unseen areas.
-	var map_rect := Rect2(-HEX_SCALE, -HEX_SCALE, 22.0 * HEX_SCALE, 18.0 * HEX_SCALE)
+	# Compute fog rect from actual city positions
+	var min_pos := Vector2(INF, INF)
+	var max_pos := Vector2(-INF, -INF)
+	for pos in _city_positions.values():
+		min_pos.x = minf(min_pos.x, pos.x)
+		min_pos.y = minf(min_pos.y, pos.y)
+		max_pos.x = maxf(max_pos.x, pos.x)
+		max_pos.y = maxf(max_pos.y, pos.y)
+	var pad := HEX_SCALE * 2.0
+	var map_rect := Rect2(min_pos.x - pad, min_pos.y - pad, max_pos.x - min_pos.x + pad * 2, max_pos.y - min_pos.y + pad * 2)
 	draw_rect(map_rect, Color(0.0, 0.0, 0.0, 0.3))
 
 
@@ -231,14 +240,25 @@ func _draw_cities() -> void:
 		draw_string(font, pos + Vector2(-name_size.x / 2, radius + 14),
 			city.city_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(1, 1, 1, name_alpha))
 
-		# Structure HP bar (only when damaged and visible)
-		if visible and city.structure_hp < city.max_structure_hp:
-			var bw: float = radius * 2.0
-			var bp := pos + Vector2(-radius, -radius - 8)
-			var pct: float = city.structure_hp / city.max_structure_hp
-			draw_rect(Rect2(bp, Vector2(bw, 4)), Color(0.2, 0.2, 0.2, 0.8))
-			var bar_color := Color(0.0, 0.8, 0.0, 0.8) if pct > 0.3 else Color(0.9, 0.2, 0.0, 0.8)
-			draw_rect(Rect2(bp, Vector2(bw * pct, 4)), bar_color)
+		# Structure HP bar — always shown for visible cities
+		if visible:
+			var bw: float = maxf(radius * 2.5, 30.0)
+			var bp := pos + Vector2(-bw / 2.0, -radius - 10)
+			var pct: float = city.structure_hp / city.max_structure_hp if city.max_structure_hp > 0 else 0.0
+			draw_rect(Rect2(bp, Vector2(bw, 5)), Color(0.2, 0.2, 0.2, 0.8))
+			var bar_color: Color
+			if pct > 0.6:
+				bar_color = Color(0.0, 0.8, 0.0, 0.8)
+			elif pct > 0.3:
+				bar_color = Color(0.9, 0.7, 0.0, 0.8)
+			else:
+				bar_color = Color(0.9, 0.2, 0.0, 0.8)
+			draw_rect(Rect2(bp, Vector2(bw * pct, 5)), bar_color)
+			# HP text above bar
+			var hp_text := "%d/%d" % [roundi(city.structure_hp), roundi(city.max_structure_hp)]
+			var hp_size := font.get_string_size(hp_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8)
+			draw_string(font, bp + Vector2((bw - hp_size.x) / 2.0, -2),
+				hp_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(1, 1, 1, 0.7))
 
 
 # --- Combat Indicators ---
@@ -320,7 +340,20 @@ func _draw_moving_stack(stack: UnitStack) -> void:
 
 func _draw_stack_indicator(stack: UnitStack, pos: Vector2) -> void:
 	var color := _get_owner_color(stack.owner_id)
-	var size := Vector2(24, 16)
+	var font := ThemeDB.fallback_font
+
+	# Build composition text: "5I 3C 2A"
+	var parts: PackedStringArray = []
+	if stack.infantry_count > 0:
+		parts.append("%dI" % stack.infantry_count)
+	if stack.cavalry_count > 0:
+		parts.append("%dC" % stack.cavalry_count)
+	if stack.artillery_count > 0:
+		parts.append("%dA" % stack.artillery_count)
+	var comp_text := " ".join(parts) if not parts.is_empty() else "0"
+	var comp_width := font.get_string_size(comp_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+
+	var size := Vector2(maxf(comp_width + 8.0, 28.0), 16.0)
 	var rect := Rect2(pos - size / 2, size)
 
 	# Selection highlight
@@ -330,11 +363,8 @@ func _draw_stack_indicator(stack: UnitStack, pos: Vector2) -> void:
 	draw_rect(rect, Color(color.r, color.g, color.b, 0.85))
 	draw_rect(rect, Color.WHITE, false, 1.0)
 
-	# Unit count
-	var font := ThemeDB.fallback_font
-	var text := str(stack.total_units())
-	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
-	draw_string(font, pos + Vector2(-tw / 2, 4), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color.WHITE)
+	# Draw composition text
+	draw_string(font, pos + Vector2(-comp_width / 2, 4), comp_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color.WHITE)
 
 
 func _get_owner_color(owner_id: int) -> Color:

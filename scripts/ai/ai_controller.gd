@@ -215,7 +215,16 @@ var _committed_stacks: Dictionary = {}
 
 
 func _is_stack_committed(stack: UnitStack) -> bool:
-	return _committed_stacks.has(stack.id) or stack.is_moving
+	return _committed_stacks.has(stack.id) or stack.is_moving or _is_pinned(stack)
+
+
+func _is_pinned(stack: UnitStack) -> bool:
+	## A stack is pinned if enemy stacks are present at the same city.
+	for other in _game_state.get_all_stacks():
+		var s: UnitStack = other as UnitStack
+		if s.owner_id != _player_id and s.city_id == stack.city_id and not s.is_moving and not s.is_empty():
+			return true
+	return false
 
 
 func _add_move_command(stack: UnitStack, target_city_id: int) -> void:

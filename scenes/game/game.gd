@@ -15,6 +15,8 @@ var _balance: Dictionary = {}
 var _tick_timer: float = 0.0
 var _tick_count: int = 0
 var _camera_speed: float = 400.0
+var _map_bounds: Rect2 = Rect2()  # Bounding box of all cities (with padding)
+var _paused: bool = false
 
 @onready var _hex_map: Node2D = $HexMap
 @onready var _camera: Camera2D = $Camera2D
@@ -22,6 +24,7 @@ var _camera_speed: float = 400.0
 @onready var _hud: Control = $UILayer/HUD
 @onready var _admin_panel: PanelContainer = $UILayer/AdminPanel
 @onready var _game_over_overlay: PanelContainer = $UILayer/GameOverOverlay
+@onready var _game_menu: PanelContainer = $UILayer/GameMenu
 
 
 func _ready() -> void:
@@ -42,6 +45,12 @@ func _ready() -> void:
 	# Game over overlay signals
 	_game_over_overlay.restart_requested.connect(_on_reset_requested)
 	_game_over_overlay.menu_requested.connect(_on_menu_requested)
+
+	# Game menu signals
+	_game_menu.resume_requested.connect(_on_menu_resume)
+	_game_menu.restart_requested.connect(_on_menu_restart)
+	_game_menu.give_up_confirmed.connect(_on_give_up)
+	_game_menu.quit_requested.connect(_on_menu_requested)
 
 
 func _init_game() -> void:
@@ -75,8 +84,8 @@ func _init_game() -> void:
 	_selected_city_id = -1
 	_selected_stack_id = -1
 
-	# Center camera roughly on the map
-	_camera.position = Vector2(640, 480)
+	# Fit camera to show all cities
+	_fit_camera_to_map()
 	_hex_map.queue_redraw()
 
 
@@ -86,7 +95,7 @@ func _process(delta: float) -> void:
 
 	_handle_camera(delta)
 
-	if not _game_state.is_game_over():
+	if not _paused and not _game_state.is_game_over():
 		_tick_simulation(delta)
 
 	# Update admin panel state display every frame if visible
@@ -112,6 +121,39 @@ func _tick_simulation(delta: float) -> void:
 		_update_hud()
 
 
+func _fit_camera_to_map() -> void:
+	## Compute bounding box of all cities and center/zoom camera to fit.
+	var cities := _game_state.get_all_cities()
+	if cities.is_empty():
+		_camera.position = Vector2(640, 480)
+		return
+
+	var min_pos := Vector2(INF, INF)
+	var max_pos := Vector2(-INF, -INF)
+	for city in cities:
+		var pixel_pos := _hex_map.get_city_pixel_pos(city.id)
+		min_pos.x = minf(min_pos.x, pixel_pos.x)
+		min_pos.y = minf(min_pos.y, pixel_pos.y)
+		max_pos.x = maxf(max_pos.x, pixel_pos.x)
+		max_pos.y = maxf(max_pos.y, pixel_pos.y)
+
+	var padding := 100.0
+	min_pos -= Vector2(padding, padding)
+	max_pos += Vector2(padding, padding)
+	_map_bounds = Rect2(min_pos, max_pos - min_pos)
+
+	# Center camera on the map
+	_camera.position = _map_bounds.get_center()
+
+	# Zoom to fit all cities in the viewport
+	var viewport_size := get_viewport_rect().size
+	var zoom_x: float = viewport_size.x / _map_bounds.size.x
+	var zoom_y: float = viewport_size.y / _map_bounds.size.y
+	var fit_zoom: float = minf(zoom_x, zoom_y)
+	fit_zoom = clampf(fit_zoom, 0.3, 3.0)
+	_camera.zoom = Vector2(fit_zoom, fit_zoom)
+
+
 func _handle_camera(delta: float) -> void:
 	var move := Vector2.ZERO
 	if Input.is_action_pressed("ui_left") or Input.is_key_pressed(KEY_A):
@@ -125,6 +167,11 @@ func _handle_camera(delta: float) -> void:
 
 	if move != Vector2.ZERO:
 		_camera.position += move.normalized() * _camera_speed * delta
+
+	# Clamp camera to map bounds
+	if _map_bounds.size.length() > 0:
+		_camera.position.x = clampf(_camera.position.x, _map_bounds.position.x, _map_bounds.end.x)
+		_camera.position.y = clampf(_camera.position.y, _map_bounds.position.y, _map_bounds.end.y)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -154,7 +201,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_TAB:
 				_cycle_stack_at_city()
 			KEY_ESCAPE:
-				_deselect_all()
+				_toggle_game_menu()
 
 
 # --- Selection ---
@@ -164,7 +211,7 @@ var _selected_stack_id: int = -1
 
 
 func _on_city_clicked(city_id: int) -> void:
-	if _game_state == null or _game_state.is_game_over():
+	if _game_state == null or _game_state.is_game_over() or _paused:
 		return
 
 	# If a stack is selected and we click a different adjacent city, issue move
@@ -325,6 +372,8 @@ func _on_stack_arrived(_stack_id: int, _city_id: int) -> void:
 
 func _on_reset_requested() -> void:
 	_game_over_overlay.visible = false
+	_game_menu.hide_menu()
+	_paused = false
 	# Disconnect old signals
 	if _game_state != null:
 		if _game_state.city_captured.is_connected(_on_city_captured):
@@ -355,4 +404,36 @@ func _on_balance_changed(new_balance: Dictionary) -> void:
 
 
 func _on_menu_requested() -> void:
+	_paused = false
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+
+# --- Game Menu ---
+
+func _toggle_game_menu() -> void:
+	if _game_state != null and _game_state.is_game_over():
+		return
+	if _game_menu.visible:
+		_game_menu.hide_menu()
+		_paused = false
+	else:
+		_deselect_all()
+		_game_menu.show_menu()
+		_paused = true
+
+
+func _on_menu_resume() -> void:
+	_game_menu.hide_menu()
+	_paused = false
+
+
+func _on_menu_restart() -> void:
+	_game_menu.hide_menu()
+	_paused = false
+	_on_reset_requested()
+
+
+func _on_give_up() -> void:
+	_paused = false
+	# Trigger victory for the opponent
+	_on_victory(AI_PLAYER_ID)
