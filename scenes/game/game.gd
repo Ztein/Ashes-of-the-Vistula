@@ -16,6 +16,7 @@ var _tick_timer: float = 0.0
 var _tick_count: int = 0
 var _camera_speed: float = 400.0
 var _map_bounds: Rect2 = Rect2()  # Bounding box of all cities (with padding)
+var _paused: bool = false
 
 @onready var _hex_map: Node2D = $HexMap
 @onready var _camera: Camera2D = $Camera2D
@@ -23,6 +24,7 @@ var _map_bounds: Rect2 = Rect2()  # Bounding box of all cities (with padding)
 @onready var _hud: Control = $UILayer/HUD
 @onready var _admin_panel: PanelContainer = $UILayer/AdminPanel
 @onready var _game_over_overlay: PanelContainer = $UILayer/GameOverOverlay
+@onready var _game_menu: PanelContainer = $UILayer/GameMenu
 
 
 func _ready() -> void:
@@ -43,6 +45,12 @@ func _ready() -> void:
 	# Game over overlay signals
 	_game_over_overlay.restart_requested.connect(_on_reset_requested)
 	_game_over_overlay.menu_requested.connect(_on_menu_requested)
+
+	# Game menu signals
+	_game_menu.resume_requested.connect(_on_menu_resume)
+	_game_menu.restart_requested.connect(_on_menu_restart)
+	_game_menu.give_up_confirmed.connect(_on_give_up)
+	_game_menu.quit_requested.connect(_on_menu_requested)
 
 
 func _init_game() -> void:
@@ -87,7 +95,7 @@ func _process(delta: float) -> void:
 
 	_handle_camera(delta)
 
-	if not _game_state.is_game_over():
+	if not _paused and not _game_state.is_game_over():
 		_tick_simulation(delta)
 
 	# Update admin panel state display every frame if visible
@@ -193,7 +201,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_TAB:
 				_cycle_stack_at_city()
 			KEY_ESCAPE:
-				_deselect_all()
+				_toggle_game_menu()
 
 
 # --- Selection ---
@@ -203,7 +211,7 @@ var _selected_stack_id: int = -1
 
 
 func _on_city_clicked(city_id: int) -> void:
-	if _game_state == null or _game_state.is_game_over():
+	if _game_state == null or _game_state.is_game_over() or _paused:
 		return
 
 	# If a stack is selected and we click a different adjacent city, issue move
@@ -364,6 +372,8 @@ func _on_stack_arrived(_stack_id: int, _city_id: int) -> void:
 
 func _on_reset_requested() -> void:
 	_game_over_overlay.visible = false
+	_game_menu.hide_menu()
+	_paused = false
 	# Disconnect old signals
 	if _game_state != null:
 		if _game_state.city_captured.is_connected(_on_city_captured):
@@ -394,4 +404,36 @@ func _on_balance_changed(new_balance: Dictionary) -> void:
 
 
 func _on_menu_requested() -> void:
+	_paused = false
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+
+# --- Game Menu ---
+
+func _toggle_game_menu() -> void:
+	if _game_state != null and _game_state.is_game_over():
+		return
+	if _game_menu.visible:
+		_game_menu.hide_menu()
+		_paused = false
+	else:
+		_deselect_all()
+		_game_menu.show_menu()
+		_paused = true
+
+
+func _on_menu_resume() -> void:
+	_game_menu.hide_menu()
+	_paused = false
+
+
+func _on_menu_restart() -> void:
+	_game_menu.hide_menu()
+	_paused = false
+	_on_reset_requested()
+
+
+func _on_give_up() -> void:
+	_paused = false
+	# Trigger victory for the opponent
+	_on_victory(AI_PLAYER_ID)

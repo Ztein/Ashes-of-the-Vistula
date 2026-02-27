@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scenes/game/game.gd" id="1"]
 [ext_resource type="Script" path="res://scenes/map/hex_map.gd" id="2"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scenes/ui/hud.gd" id="4"]
 [ext_resource type="PackedScene" path="res://scenes/ui/admin_panel.tscn" id="5"]
 [ext_resource type="Script" path="res://scenes/ui/game_over_overlay.gd" id="6"]
+[ext_resource type="Script" path="res://scenes/ui/game_menu.gd" id="7"]
 
 [node name="Game" type="Node2D"]
 script = ExtResource("1")
@@ -81,6 +82,69 @@ layout_mode = 2
 text = "Stack Info"
 
 [node name="AdminPanel" parent="UILayer" instance=ExtResource("5")]
+
+[node name="GameMenu" type="PanelContainer" parent="UILayer"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = -120.0
+offset_right = 150.0
+offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 2
+visible = false
+script = ExtResource("7")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UILayer/GameMenu"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 10
+
+[node name="TitleLabel" type="Label" parent="UILayer/GameMenu/VBoxContainer"]
+layout_mode = 2
+text = "PAUSED"
+horizontal_alignment = 1
+
+[node name="MainButtons" type="VBoxContainer" parent="UILayer/GameMenu/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ResumeBtn" type="Button" parent="UILayer/GameMenu/VBoxContainer/MainButtons"]
+layout_mode = 2
+text = "Resume"
+
+[node name="RestartBtn" type="Button" parent="UILayer/GameMenu/VBoxContainer/MainButtons"]
+layout_mode = 2
+text = "Restart Game"
+
+[node name="GiveUpBtn" type="Button" parent="UILayer/GameMenu/VBoxContainer/MainButtons"]
+layout_mode = 2
+text = "Give Up"
+
+[node name="QuitBtn" type="Button" parent="UILayer/GameMenu/VBoxContainer/MainButtons"]
+layout_mode = 2
+text = "Quit to Menu"
+
+[node name="ConfirmPanel" type="VBoxContainer" parent="UILayer/GameMenu/VBoxContainer"]
+layout_mode = 2
+visible = false
+theme_override_constants/separation = 10
+
+[node name="ConfirmLabel" type="Label" parent="UILayer/GameMenu/VBoxContainer/ConfirmPanel"]
+layout_mode = 2
+text = "Are you sure?"
+horizontal_alignment = 1
+
+[node name="YesBtn" type="Button" parent="UILayer/GameMenu/VBoxContainer/ConfirmPanel"]
+layout_mode = 2
+text = "Yes, Give Up"
+
+[node name="NoBtn" type="Button" parent="UILayer/GameMenu/VBoxContainer/ConfirmPanel"]
+layout_mode = 2
+text = "Cancel"
 
 [node name="GameOverOverlay" type="PanelContainer" parent="UILayer"]
 anchors_preset = 8
