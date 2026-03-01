@@ -121,6 +121,7 @@ func _tick_simulation(delta: float) -> void:
 
 		_game_state.tick()
 		_tick_count += 1
+		_clear_stale_selection()
 		_hex_map.queue_redraw()
 		_update_hud()
 		_update_combat_info()
@@ -285,6 +286,16 @@ func _on_stack_double_clicked(city_id: int) -> void:
 
 func _on_right_clicked() -> void:
 	_deselect_all()
+
+
+func _clear_stale_selection() -> void:
+	if _selected_stack_id < 0:
+		return
+	var stack := _game_state.get_stack(_selected_stack_id)
+	if stack == null or stack.is_empty():
+		_selected_stack_id = -1
+		_hex_map.set_selection(_selected_city_id, -1)
+		_stack_info.visible = false
 
 
 func _deselect_all() -> void:
