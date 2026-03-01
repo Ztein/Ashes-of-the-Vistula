@@ -70,10 +70,10 @@ unresponsive.
 - `unit_stack.gd` — `is_empty()` behavior change
 
 ## Acceptance Criteria
-- [ ] `_get_player_stacks_at_city()` filters out empty stacks
-- [ ] Siege/battle state is correctly cleaned up when all combatants die
-- [ ] Selected stack reference is cleared when the stack is destroyed
-- [ ] Player can select and move stacks under normal conditions
-- [ ] Production halted during combat does not create permanently blocked cities
-- [ ] All existing tests pass
-- [ ] New tests cover: stale siege cleanup, phantom stack filtering, stale selection
+- [x] `_get_player_stacks_at_city()` filters out empty stacks
+- [x] Siege/battle state is correctly cleaned up when all combatants die
+- [x] Selected stack reference is cleared when the stack is destroyed
+- [x] Player can select and move stacks under normal conditions
+- [x] Production halted during combat does not create permanently blocked cities
+- [x] All existing tests pass
+- [x] New tests cover: stale siege cleanup, phantom stack filtering, stale selection
