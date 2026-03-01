@@ -434,7 +434,23 @@ func _update_move_destinations() -> void:
 	if stack == null or stack.is_empty() or stack.owner_id != PLAYER_ID:
 		_hex_map.set_move_destinations([])
 		return
-	# Find adjacent cities that can be moved to
+	# Check if pinned by enemy stacks at source city
+	var pinned := false
+	for other_stack in _game_state.get_all_stacks():
+		var s: UnitStack = other_stack as UnitStack
+		if s.owner_id != PLAYER_ID and s.city_id == _selected_city_id and not s.is_moving and not s.is_empty():
+			pinned = true
+			break
+	if pinned:
+		_hex_map.set_move_destinations([])
+		return
+	# Check if player can afford an order
+	var cmd_info := _game_state.get_command_info(PLAYER_ID)
+	var move_cost: int = int(_balance.get("command", {}).get("order_costs", {}).get("move_stack", 1))
+	if cmd_info.get("current_orders", 0.0) < move_cost:
+		_hex_map.set_move_destinations([])
+		return
+	# Find adjacent cities
 	var destinations: Array = []
 	for city in _game_state.get_all_cities():
 		if city.id == _selected_city_id:
