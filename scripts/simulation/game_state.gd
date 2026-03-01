@@ -148,7 +148,7 @@ func get_stacks_at_city(player_id: int, city_id: int) -> Array:
 	var result: Array = []
 	for stack in _stacks.values():
 		var s: UnitStack = stack as UnitStack
-		if s.owner_id == player_id and s.city_id == city_id and not s.is_moving:
+		if s.owner_id == player_id and s.city_id == city_id and not s.is_moving and not s.is_empty():
 			result.append(s)
 	return result
 
@@ -603,7 +603,7 @@ func _get_player_stacks_at_city(player_id: int, city_id: int) -> Array:
 	var result: Array = []
 	for stack_obj in _stacks.values():
 		var s: UnitStack = stack_obj as UnitStack
-		if s.owner_id == player_id and s.city_id == city_id and not s.is_moving:
+		if s.owner_id == player_id and s.city_id == city_id and not s.is_moving and not s.is_empty():
 			result.append(s)
 	return result
 
