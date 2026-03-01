@@ -99,14 +99,14 @@ if _sieges.has(city.id) or _battles.has(city.id):
   production continues, the produced units MUST have their HP initialized properly.
 
 ## Acceptance Criteria
-- [ ] Unit counts after damage use floor rounding (no phantom units from ceili)
-- [ ] `_create_stack()` initializes HP pools from balance config
-- [ ] `_add_produced_unit()` adds HP when incrementing count on existing stack
-- [ ] `is_empty()` returns true when hp_pool <= 0.0 (even if count is stale)
-- [ ] Stacks with 0 HP are cleaned up and don't contribute DPS
-- [ ] Production during siege/battle either skipped or units properly HP-initialized
-- [ ] Multi-stack battles resolve correctly — all defenders die when overwhelmed
-- [ ] Single-stack battles still work correctly (no regression)
-- [ ] Existing combat tests updated and still pass
-- [ ] New tests cover: phantom unit prevention, zero-HP-pool cleanup, production HP init
-- [ ] Full test suite passes
+- [x] DPS/siege calculations use HP-proportional formula (no phantom DPS from ceili count inflation)
+- [x] `_create_stack()` initializes HP pools from balance config
+- [x] `_add_produced_unit()` adds HP when incrementing count on existing stack
+- [x] `is_empty()` returns true when hp_pool <= 0.0 (even if count is stale)
+- [x] Stacks with 0 HP are cleaned up and don't contribute DPS
+- [x] Production during siege/battle skipped
+- [x] Multi-stack battles resolve correctly — all defenders die when overwhelmed
+- [x] Single-stack battles still work correctly (no regression)
+- [x] Existing combat tests updated and still pass
+- [x] New tests cover: phantom unit prevention, zero-HP-pool cleanup, HP-proportional DPS
+- [x] Full test suite passes (177/177)
