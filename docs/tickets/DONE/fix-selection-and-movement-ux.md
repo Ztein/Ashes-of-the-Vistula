@@ -54,12 +54,12 @@ pinned by enemy stacks, not enough orders).
 - `scenes/map/hex_map.gd` — stack click areas, destination highlights, drawing
 
 ## Acceptance Criteria
-- [ ] Left-click deselect only fires when clicking empty space (not on a city)
-- [ ] Player can select a stack and move it to an adjacent city by clicking
-- [ ] Clicking the same city cycles through stacks at that city
-- [ ] Clicking a stack indicator directly selects that stack
-- [ ] Adjacent cities highlight as valid destinations when a stack is selected
-- [ ] Cities that cannot be moved to (pinning, no orders) show dimmed or no highlight
-- [ ] Right-click still deselects
-- [ ] Double-click on city still splits the selected stack
-- [ ] All existing tests pass
+- [x] Left-click deselect only fires when clicking empty space (not on a city)
+- [x] Player can select a stack and move it to an adjacent city by clicking
+- [x] Clicking the same city cycles through stacks at that city
+- [x] Clicking a stack indicator directly selects that stack
+- [x] Adjacent cities highlight as valid destinations when a stack is selected
+- [x] Cities that cannot be moved to (pinning, no orders) show dimmed or no highlight
+- [x] Right-click still deselects
+- [x] Double-click on city still splits the selected stack
+- [x] All existing tests pass

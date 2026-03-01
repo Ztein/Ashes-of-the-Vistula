@@ -3,6 +3,7 @@ extends Node2D
 ## combat indicators (siege/battle), and fog of war.
 
 signal city_clicked(city_id: int)
+signal stack_clicked(stack_id: int, city_id: int)
 signal stack_double_clicked(city_id: int)
 signal right_clicked()
 
@@ -18,6 +19,8 @@ var _selected_city_id: int = -1
 var _selected_stack_id: int = -1
 var _fog_enabled: bool = true
 var _elapsed: float = 0.0
+var _stack_indicators: Dictionary = {}  # stack_id -> { "rect": Rect2, "city_id": int }
+var _move_destinations: Array = []  # city_ids to highlight as valid move targets
 
 
 func _process(delta: float) -> void:
@@ -42,6 +45,10 @@ func setup(game_state: GameState, map_data: Dictionary, scenario_data: Dictionar
 func set_selection(city_id: int, stack_id: int) -> void:
 	_selected_city_id = city_id
 	_selected_stack_id = stack_id
+
+
+func set_move_destinations(destinations: Array) -> void:
+	_move_destinations = destinations
 
 
 func set_fog_enabled(enabled: bool) -> void:
@@ -72,9 +79,27 @@ func _on_area_input(_viewport: Node, event: InputEvent, _shape_idx: int, city_id
 			if event.double_click:
 				stack_double_clicked.emit(city_id)
 			else:
-				city_clicked.emit(city_id)
+				# Check if click is on a specific stack indicator
+				var mouse_local: Vector2 = get_local_mouse_position()
+				var hit_stack_id: int = _hit_test_stack(mouse_local, city_id)
+				if hit_stack_id >= 0:
+					stack_clicked.emit(hit_stack_id, city_id)
+				else:
+					city_clicked.emit(city_id)
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			right_clicked.emit()
+
+
+func _hit_test_stack(mouse_pos: Vector2, city_id: int) -> int:
+	## Check if mouse_pos (in local coords) hits a stack indicator at this city.
+	## Returns stack_id if hit, -1 otherwise.
+	for stack_id in _stack_indicators:
+		var info: Dictionary = _stack_indicators[stack_id]
+		if int(info["city_id"]) == city_id:
+			var rect: Rect2 = info["rect"] as Rect2
+			if rect.has_point(mouse_pos):
+				return int(stack_id)
+	return -1
 
 
 func _draw() -> void:
@@ -86,6 +111,7 @@ func _draw() -> void:
 	_draw_cities()
 	_draw_combat_indicators()
 	_draw_selection_highlight()
+	_draw_move_destinations()
 	_draw_stacks()
 
 
@@ -335,9 +361,28 @@ func _draw_selection_highlight() -> void:
 	draw_arc(pos, radius, 0, TAU, 32, Color.YELLOW, 2.5)
 
 
+func _draw_move_destinations() -> void:
+	if _move_destinations.is_empty():
+		return
+	for city_id in _move_destinations:
+		if not _city_positions.has(city_id):
+			continue
+		var city := _game_state.get_city(city_id)
+		if city == null:
+			continue
+		var dest_pos: Vector2 = _city_positions[city_id]
+		var dest_radius: float = CITY_SIZES.get(city.tier, 12.0) + 6.0
+		# Pulsing green highlight for valid destinations
+		var pulse: float = 0.6 + 0.4 * sin(_elapsed * 4.0)
+		draw_arc(dest_pos, dest_radius, 0, TAU, 32, Color(0.3, 1.0, 0.3, 0.4 * pulse), 2.5)
+		# Draw a small arrow/dot toward the destination
+		draw_circle(dest_pos, 4.0, Color(0.3, 1.0, 0.3, 0.3 * pulse))
+
+
 # --- Stacks ---
 
 func _draw_stacks() -> void:
+	_stack_indicators.clear()
 	var by_city: Dictionary = {}
 	for stack in _game_state.get_all_stacks():
 		var s: UnitStack = stack as UnitStack
@@ -363,6 +408,13 @@ func _draw_stacks() -> void:
 			var base: Vector2 = _city_positions[city_id]
 			var pos: Vector2 = base + Vector2(offset_x, -28)
 			_draw_stack_indicator(s, pos)
+			# Cache the indicator rect for click hit testing
+			var font := ThemeDB.fallback_font
+			var type_letter: String = s.unit_type.substr(0, 1).to_upper()
+			var comp_text := "%d%s" % [s.count, type_letter]
+			var comp_width := font.get_string_size(comp_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+			var ind_size := Vector2(maxf(comp_width + 8.0, 28.0), 16.0)
+			_stack_indicators[s.id] = { "rect": Rect2(pos - ind_size / 2, ind_size), "city_id": city_id }
 
 
 func _draw_moving_stack(stack: UnitStack) -> void:

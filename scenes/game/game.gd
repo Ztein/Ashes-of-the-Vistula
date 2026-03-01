@@ -17,6 +17,7 @@ var _tick_count: int = 0
 var _camera_speed: float = 400.0
 var _map_bounds: Rect2 = Rect2()  # Bounding box of all cities (with padding)
 var _paused: bool = false
+var _pending_deselect: bool = false
 
 @onready var _hex_map: Node2D = $HexMap
 @onready var _camera: Camera2D = $Camera2D
@@ -60,6 +61,7 @@ func _init_game() -> void:
 
 	_hex_map.setup(_game_state, _map_data, _scenario_data)
 	_hex_map.city_clicked.connect(_on_city_clicked)
+	_hex_map.stack_clicked.connect(_on_stack_clicked)
 	_hex_map.stack_double_clicked.connect(_on_stack_double_clicked)
 	_hex_map.right_clicked.connect(_on_right_clicked)
 
@@ -87,6 +89,7 @@ func _init_game() -> void:
 	_tick_count = 0
 	_selected_city_id = -1
 	_selected_stack_id = -1
+	_pending_deselect = false
 
 	# Fit camera to show all cities
 	_fit_camera_to_map()
@@ -96,6 +99,12 @@ func _init_game() -> void:
 func _process(delta: float) -> void:
 	if _game_state == null:
 		return
+
+	# Deferred deselect: if _unhandled_input set the flag and no city/stack
+	# click cleared it, deselect now (click was on empty space).
+	if _pending_deselect:
+		_deselect_all()
+		_pending_deselect = false
 
 	_handle_camera(delta)
 
@@ -193,8 +202,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			_deselect_all()
 		elif event.button_index == MOUSE_BUTTON_LEFT:
-			# Click on empty space (not on a city) — deselect
-			_deselect_all()
+			# Defer deselect: Area2D physics picking runs after _unhandled_input.
+			# If a city/stack click fires, it clears this flag. Otherwise,
+			# _process will deselect (click was on empty space).
+			_pending_deselect = true
 
 	# Keyboard commands
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -220,6 +231,7 @@ var _selected_stack_id: int = -1
 
 
 func _on_city_clicked(city_id: int) -> void:
+	_pending_deselect = false
 	if _game_state == null or _game_state.is_game_over() or _paused:
 		return
 
@@ -257,6 +269,7 @@ func _on_city_clicked(city_id: int) -> void:
 				_hex_map.set_selection(_selected_city_id, _selected_stack_id)
 				_hex_map.queue_redraw()
 				_update_stack_info()
+				_update_move_destinations()
 		else:
 			# Only one stack — clicking again deselects
 			_deselect_all()
@@ -274,6 +287,31 @@ func _on_city_clicked(city_id: int) -> void:
 	_hex_map.queue_redraw()
 	_update_stack_info()
 	_update_combat_info()
+	_update_move_destinations()
+
+
+func _on_stack_clicked(stack_id: int, city_id: int) -> void:
+	_pending_deselect = false
+	if _game_state == null or _game_state.is_game_over() or _paused:
+		return
+
+	var stack := _game_state.get_stack(stack_id)
+	if stack == null or stack.is_empty():
+		return
+
+	# Only allow selecting own stacks
+	if stack.owner_id != PLAYER_ID:
+		# Clicked enemy stack — treat as city click
+		_on_city_clicked(city_id)
+		return
+
+	_selected_city_id = city_id
+	_selected_stack_id = stack_id
+	_hex_map.set_selection(_selected_city_id, _selected_stack_id)
+	_hex_map.queue_redraw()
+	_update_stack_info()
+	_update_combat_info()
+	_update_move_destinations()
 
 
 func _on_stack_double_clicked(city_id: int) -> void:
@@ -302,6 +340,7 @@ func _deselect_all() -> void:
 	_selected_city_id = -1
 	_selected_stack_id = -1
 	_hex_map.set_selection(-1, -1)
+	_hex_map.set_move_destinations([])
 	_hex_map.queue_redraw()
 	_stack_info.visible = false
 	_combat_info.visible = false
@@ -322,6 +361,7 @@ func _cycle_stack_at_city() -> void:
 	_hex_map.set_selection(_selected_city_id, _selected_stack_id)
 	_hex_map.queue_redraw()
 	_update_stack_info()
+	_update_move_destinations()
 
 
 # --- Commands ---
@@ -386,6 +426,40 @@ func _update_hud() -> void:
 	_hud.update_display(cmd_info, supply_info, _game_state)
 
 
+func _update_move_destinations() -> void:
+	if _selected_stack_id < 0 or _selected_city_id < 0:
+		_hex_map.set_move_destinations([])
+		return
+	var stack := _game_state.get_stack(_selected_stack_id)
+	if stack == null or stack.is_empty() or stack.owner_id != PLAYER_ID:
+		_hex_map.set_move_destinations([])
+		return
+	# Check if pinned by enemy stacks at source city
+	var pinned := false
+	for other_stack in _game_state.get_all_stacks():
+		var s: UnitStack = other_stack as UnitStack
+		if s.owner_id != PLAYER_ID and s.city_id == _selected_city_id and not s.is_moving and not s.is_empty():
+			pinned = true
+			break
+	if pinned:
+		_hex_map.set_move_destinations([])
+		return
+	# Check if player can afford an order
+	var cmd_info := _game_state.get_command_info(PLAYER_ID)
+	var move_cost: int = int(_balance.get("command", {}).get("order_costs", {}).get("move_stack", 1))
+	if cmd_info.get("current_orders", 0.0) < move_cost:
+		_hex_map.set_move_destinations([])
+		return
+	# Find adjacent cities
+	var destinations: Array = []
+	for city in _game_state.get_all_cities():
+		if city.id == _selected_city_id:
+			continue
+		if _game_state.are_adjacent(_selected_city_id, city.id):
+			destinations.append(city.id)
+	_hex_map.set_move_destinations(destinations)
+
+
 func _update_combat_info() -> void:
 	if _combat_info == null:
 		return
@@ -448,6 +522,8 @@ func _on_reset_requested() -> void:
 			_game_state.stack_arrived.disconnect(_on_stack_arrived)
 	if _hex_map.city_clicked.is_connected(_on_city_clicked):
 		_hex_map.city_clicked.disconnect(_on_city_clicked)
+	if _hex_map.stack_clicked.is_connected(_on_stack_clicked):
+		_hex_map.stack_clicked.disconnect(_on_stack_clicked)
 	if _hex_map.stack_double_clicked.is_connected(_on_stack_double_clicked):
 		_hex_map.stack_double_clicked.disconnect(_on_stack_double_clicked)
 	if _hex_map.right_clicked.is_connected(_on_right_clicked):
