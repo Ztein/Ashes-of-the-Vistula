@@ -48,14 +48,20 @@ func total_units() -> int:
 
 func total_dps(balance: Dictionary) -> float:
 	var units_config: Dictionary = balance.get("units", {})
+	var hp_each: float = float(units_config.get(unit_type, {}).get("hp", 100))
 	var dps: float = float(units_config.get(unit_type, {}).get("dps", 0))
-	return count * dps
+	if hp_each <= 0.0:
+		return 0.0
+	return (hp_pool / hp_each) * dps
 
 
 func total_siege_damage(balance: Dictionary) -> float:
 	var units_config: Dictionary = balance.get("units", {})
+	var hp_each: float = float(units_config.get(unit_type, {}).get("hp", 100))
 	var siege: float = float(units_config.get(unit_type, {}).get("siege_damage", 0))
-	return count * siege
+	if hp_each <= 0.0:
+		return 0.0
+	return (hp_pool / hp_each) * siege
 
 
 func movement_speed(balance: Dictionary) -> float:
@@ -124,4 +130,4 @@ func tick_move(delta: float, speed: float) -> bool:
 
 
 func is_empty() -> bool:
-	return count == 0
+	return count == 0 or hp_pool <= 0.0
