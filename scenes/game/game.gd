@@ -235,7 +235,7 @@ func _on_city_clicked(city_id: int) -> void:
 	if _game_state == null or _game_state.is_game_over() or _paused:
 		return
 
-	# If a stack is selected and we click a different adjacent city, issue move
+	# If a stack is selected and we click a different city, try to move
 	if _selected_stack_id >= 0 and city_id != _selected_city_id:
 		var stack := _game_state.get_stack(_selected_stack_id)
 		if stack != null and not stack.is_moving:
@@ -249,50 +249,32 @@ func _on_city_clicked(city_id: int) -> void:
 				_deselect_all()
 				_hex_map.queue_redraw()
 				return
-
-	# Clicking the same city — cycle through stacks or toggle deselect
-	if city_id == _selected_city_id and _selected_stack_id >= 0:
-		var stacks := _game_state.get_stacks_at_city(PLAYER_ID, city_id)
-		if stacks.size() > 1:
-			# Find current stack index and cycle to next
-			var current_idx: int = -1
-			for i in range(stacks.size()):
-				if (stacks[i] as UnitStack).id == _selected_stack_id:
-					current_idx = i
-					break
-			var next_idx: int = (current_idx + 1) % stacks.size()
-			if next_idx == 0 and current_idx >= 0:
-				# Cycled back to first — deselect
-				_deselect_all()
-			else:
-				_selected_stack_id = (stacks[next_idx] as UnitStack).id
-				_hex_map.set_selection(_selected_city_id, _selected_stack_id)
-				_hex_map.queue_redraw()
-				_update_stack_info()
-				_update_move_destinations()
-		else:
-			# Only one stack — clicking again deselects
-			_deselect_all()
+		# Move failed (not adjacent, pinned, no orders) — do nothing
 		return
 
-	# Select the city and the first player stack there
+	# Clicking the same city with a stack selected — deselect
+	if city_id == _selected_city_id and _selected_stack_id >= 0:
+		_deselect_all()
+		return
+
+	# No stack selected — show city info only, no stack auto-selection
 	_selected_city_id = city_id
 	_selected_stack_id = -1
-
-	var stacks := _game_state.get_stacks_at_city(PLAYER_ID, city_id)
-	if not stacks.is_empty():
-		_selected_stack_id = (stacks[0] as UnitStack).id
-
-	_hex_map.set_selection(_selected_city_id, _selected_stack_id)
+	_hex_map.set_selection(_selected_city_id, -1)
+	_hex_map.set_move_destinations([])
 	_hex_map.queue_redraw()
 	_update_stack_info()
 	_update_combat_info()
-	_update_move_destinations()
 
 
 func _on_stack_clicked(stack_id: int, city_id: int) -> void:
 	_pending_deselect = false
 	if _game_state == null or _game_state.is_game_over() or _paused:
+		return
+
+	# If we already have a stack selected at a different city, treat as move
+	if _selected_stack_id >= 0 and city_id != _selected_city_id:
+		_on_city_clicked(city_id)
 		return
 
 	var stack := _game_state.get_stack(stack_id)
@@ -301,10 +283,14 @@ func _on_stack_clicked(stack_id: int, city_id: int) -> void:
 
 	# Only allow selecting own stacks
 	if stack.owner_id != PLAYER_ID:
-		# Clicked enemy stack — treat as city click
-		_on_city_clicked(city_id)
 		return
 
+	# Toggle: clicking already-selected stack deselects
+	if _selected_stack_id == stack_id:
+		_deselect_all()
+		return
+
+	# Select this specific stack
 	_selected_city_id = city_id
 	_selected_stack_id = stack_id
 	_hex_map.set_selection(_selected_city_id, _selected_stack_id)

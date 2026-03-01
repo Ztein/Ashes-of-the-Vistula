@@ -21,6 +21,7 @@ var _fog_enabled: bool = true
 var _elapsed: float = 0.0
 var _stack_indicators: Dictionary = {}  # stack_id -> { "rect": Rect2, "city_id": int }
 var _move_destinations: Array = []  # city_ids to highlight as valid move targets
+var _hovered_city_id: int = -1  # city the mouse is hovering over
 
 
 func _process(delta: float) -> void:
@@ -66,10 +67,12 @@ func _create_city_click_areas() -> void:
 		area.input_pickable = true
 		var shape := CollisionShape2D.new()
 		var circle := CircleShape2D.new()
-		circle.radius = CITY_SIZES.get(city.tier, 12.0) + 8.0
+		circle.radius = CITY_SIZES.get(city.tier, 12.0) + 24.0  # Large enough to cover stack indicators at y=-28
 		shape.shape = circle
 		area.add_child(shape)
 		area.input_event.connect(_on_area_input.bind(city.id))
+		area.mouse_entered.connect(_on_area_hover_enter.bind(city.id))
+		area.mouse_exited.connect(_on_area_hover_exit.bind(city.id))
 		add_child(area)
 
 
@@ -102,6 +105,17 @@ func _hit_test_stack(mouse_pos: Vector2, city_id: int) -> int:
 	return -1
 
 
+func _on_area_hover_enter(city_id: int) -> void:
+	_hovered_city_id = city_id
+	queue_redraw()
+
+
+func _on_area_hover_exit(city_id: int) -> void:
+	if _hovered_city_id == city_id:
+		_hovered_city_id = -1
+		queue_redraw()
+
+
 func _draw() -> void:
 	if _game_state == null:
 		return
@@ -112,6 +126,7 @@ func _draw() -> void:
 	_draw_combat_indicators()
 	_draw_selection_highlight()
 	_draw_move_destinations()
+	_draw_move_preview_line()
 	_draw_stacks()
 
 
@@ -379,6 +394,38 @@ func _draw_move_destinations() -> void:
 		draw_circle(dest_pos, 4.0, Color(0.3, 1.0, 0.3, 0.3 * pulse))
 
 
+func _draw_move_preview_line() -> void:
+	## Draw a line from the selected stack to the hovered destination city.
+	if _selected_stack_id < 0 or _hovered_city_id < 0:
+		return
+	if _hovered_city_id == _selected_city_id:
+		return
+	# Only draw if hovered city is a valid move destination
+	if not _move_destinations.has(_hovered_city_id):
+		return
+	if not _stack_indicators.has(_selected_stack_id):
+		return
+
+	var stack_info: Dictionary = _stack_indicators[_selected_stack_id]
+	var stack_rect: Rect2 = stack_info["rect"] as Rect2
+	var from_pos: Vector2 = stack_rect.get_center()
+	var to_pos: Vector2 = _city_positions.get(_hovered_city_id, Vector2.ZERO)
+
+	# Draw the line
+	var line_color := Color(0.3, 1.0, 0.3, 0.7)
+	draw_line(from_pos, to_pos, line_color, 2.0)
+
+	# Draw arrowhead
+	var dir: Vector2 = (to_pos - from_pos).normalized()
+	var perp: Vector2 = Vector2(-dir.y, dir.x)
+	var city := _game_state.get_city(_hovered_city_id)
+	var arrow_tip: Vector2 = to_pos - dir * (CITY_SIZES.get(city.tier, 12.0) + 6.0) if city != null else to_pos
+	var arrow_size: float = 8.0
+	var arrow_a: Vector2 = arrow_tip - dir * arrow_size + perp * arrow_size * 0.5
+	var arrow_b: Vector2 = arrow_tip - dir * arrow_size - perp * arrow_size * 0.5
+	draw_colored_polygon(PackedVector2Array([arrow_tip, arrow_a, arrow_b]), line_color)
+
+
 # --- Stacks ---
 
 func _draw_stacks() -> void:
@@ -442,11 +489,17 @@ func _draw_stack_indicator(stack: UnitStack, pos: Vector2) -> void:
 	var size := Vector2(maxf(comp_width + 8.0, 28.0), 16.0)
 	var rect := Rect2(pos - size / 2, size)
 
-	# Selection highlight
+	# Selection highlight — prominent glow + tint so the selected stack is unmistakable
 	if stack.id == _selected_stack_id:
-		draw_rect(Rect2(rect.position - Vector2(2, 2), rect.size + Vector2(4, 4)), Color.YELLOW, false, 2.0)
+		# Outer glow
+		draw_rect(Rect2(rect.position - Vector2(4, 4), rect.size + Vector2(8, 8)), Color(1.0, 1.0, 0.0, 0.25))
+		# Thick yellow border
+		draw_rect(Rect2(rect.position - Vector2(2, 2), rect.size + Vector2(4, 4)), Color.YELLOW, false, 3.0)
 
 	draw_rect(rect, Color(color.r, color.g, color.b, 0.85))
+	# Yellow tint overlay for selected stack
+	if stack.id == _selected_stack_id:
+		draw_rect(rect, Color(1.0, 1.0, 0.0, 0.2))
 	draw_rect(rect, Color.WHITE, false, 1.0)
 
 	# Draw composition text
