@@ -23,6 +23,7 @@ var _paused: bool = false
 @onready var _stack_info: PanelContainer = $UILayer/StackInfo
 @onready var _hud: Control = $UILayer/HUD
 @onready var _admin_panel: PanelContainer = $UILayer/AdminPanel
+@onready var _combat_info: PanelContainer = $UILayer/CombatInfo
 @onready var _game_over_overlay: PanelContainer = $UILayer/GameOverOverlay
 @onready var _game_menu: PanelContainer = $UILayer/GameMenu
 
@@ -70,6 +71,7 @@ func _init_game() -> void:
 	_game_state.stack_arrived.connect(_on_stack_arrived)
 
 	_stack_info.visible = false
+	_combat_info.visible = false
 	_game_over_overlay.visible = false
 
 	# Initialize AI opponent
@@ -121,6 +123,7 @@ func _tick_simulation(delta: float) -> void:
 		_tick_count += 1
 		_hex_map.queue_redraw()
 		_update_hud()
+		_update_combat_info()
 
 
 func _fit_camera_to_map() -> void:
@@ -269,6 +272,7 @@ func _on_city_clicked(city_id: int) -> void:
 	_hex_map.set_selection(_selected_city_id, _selected_stack_id)
 	_hex_map.queue_redraw()
 	_update_stack_info()
+	_update_combat_info()
 
 
 func _on_stack_double_clicked(city_id: int) -> void:
@@ -289,6 +293,7 @@ func _deselect_all() -> void:
 	_hex_map.set_selection(-1, -1)
 	_hex_map.queue_redraw()
 	_stack_info.visible = false
+	_combat_info.visible = false
 
 
 func _cycle_stack_at_city() -> void:
@@ -370,18 +375,27 @@ func _update_hud() -> void:
 	_hud.update_display(cmd_info, supply_info, _game_state)
 
 
+func _update_combat_info() -> void:
+	if _combat_info == null:
+		return
+	_combat_info.update_display(_selected_city_id, _game_state, _balance)
+
+
 # --- Signal Handlers ---
 
 func _on_city_captured(_city_id: int, _new_owner: int) -> void:
 	_hex_map.queue_redraw()
+	_update_combat_info()
 
 
 func _on_siege_started(_city_id: int, _attacker: int) -> void:
 	_hex_map.queue_redraw()
+	_update_combat_info()
 
 
 func _on_battle_started(_city_id: int) -> void:
 	_hex_map.queue_redraw()
+	_update_combat_info()
 
 
 func _on_victory(winner_id: int) -> void:
