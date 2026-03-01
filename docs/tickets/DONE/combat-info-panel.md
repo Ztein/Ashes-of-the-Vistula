@@ -42,15 +42,15 @@ When a player selects a city that has an active siege or battle, a **Combat Info
 - Pull live data each tick from `game_state.get_stacks_at_city()`, `city.structure_hp`, stack stats
 
 ## Acceptance Criteria
-- [ ] Selecting a city under siege shows the combat info panel with siege details
-- [ ] Selecting a city in battle shows the combat info panel with battle details
-- [ ] Panel updates live each simulation tick (damage, HP, unit counts change in real time)
-- [ ] Attacker and defender sides are clearly labeled with player colors
-- [ ] Each stack's contribution is listed (type, count, damage output)
-- [ ] Total DPS for each side is shown
-- [ ] Estimated time to breach is shown during siege phase
-- [ ] Structure HP bar with current/max values is shown during siege
-- [ ] Panel hides when selecting a city with no active combat
-- [ ] Panel hides when combat ends (city captured or attackers retreat)
-- [ ] Panel coexists with StackInfo and HUD without overlapping
-- [ ] No simulation code is modified — panel is purely presentational
+- [x] Selecting a city under siege shows the combat info panel with siege details
+- [x] Selecting a city in battle shows the combat info panel with battle details
+- [x] Panel updates live each simulation tick (damage, HP, unit counts change in real time)
+- [x] Attacker and defender sides are clearly labeled with player colors
+- [x] Each stack's contribution is listed (type, count, damage output)
+- [x] Total DPS for each side is shown
+- [x] Estimated time to breach is shown during siege phase
+- [x] Structure HP bar with current/max values is shown during siege
+- [x] Panel hides when selecting a city with no active combat
+- [x] Panel hides when combat ends (city captured or attackers retreat)
+- [x] Panel coexists with StackInfo and HUD without overlapping
+- [x] No simulation code is modified — panel is purely presentational
