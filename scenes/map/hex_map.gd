@@ -2,10 +2,7 @@ extends Node2D
 ## Renders the game map: adjacency lines, territory overlay, cities, stacks,
 ## combat indicators (siege/battle), and fog of war.
 
-signal city_clicked(city_id: int)
-signal stack_clicked(stack_id: int, city_id: int)
-signal stack_double_clicked(city_id: int)
-signal right_clicked()
+signal right_clicked()  # kept for compatibility but unused in new input model
 
 const HEX_SCALE: float = 64.0
 const CITY_SIZES := {"hamlet": 12.0, "village": 18.0, "major_city": 24.0}
@@ -61,48 +58,43 @@ func get_city_pixel_pos(city_id: int) -> Vector2:
 
 
 func _create_city_click_areas() -> void:
+	## Area2D nodes for hover detection only — all click handling is in game.gd.
 	for city in _game_state.get_all_cities():
 		var area := Area2D.new()
 		area.position = _city_positions[city.id]
 		area.input_pickable = true
 		var shape := CollisionShape2D.new()
 		var circle := CircleShape2D.new()
-		circle.radius = CITY_SIZES.get(city.tier, 12.0) + 24.0  # Large enough to cover stack indicators at y=-28
+		circle.radius = CITY_SIZES.get(city.tier, 12.0) + 24.0
 		shape.shape = circle
 		area.add_child(shape)
-		area.input_event.connect(_on_area_input.bind(city.id))
+		# Hover only — no click handling here
 		area.mouse_entered.connect(_on_area_hover_enter.bind(city.id))
 		area.mouse_exited.connect(_on_area_hover_exit.bind(city.id))
 		add_child(area)
 
 
-func _on_area_input(_viewport: Node, event: InputEvent, _shape_idx: int, city_id: int) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			if event.double_click:
-				stack_double_clicked.emit(city_id)
-			else:
-				# Check if click is on a specific stack indicator
-				var mouse_local: Vector2 = get_local_mouse_position()
-				var hit_stack_id: int = _hit_test_stack(mouse_local, city_id)
-				if hit_stack_id >= 0:
-					stack_clicked.emit(hit_stack_id, city_id)
-				else:
-					city_clicked.emit(city_id)
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			right_clicked.emit()
+func get_nearest_city(local_pos: Vector2, max_distance: float = 100.0) -> int:
+	## Returns the city_id of the nearest city within max_distance, or -1.
+	var best_id: int = -1
+	var best_dist: float = max_distance
+	for city_id in _city_positions:
+		var dist: float = local_pos.distance_to(_city_positions[city_id])
+		if dist < best_dist:
+			best_dist = dist
+			best_id = int(city_id)
+	return best_id
 
 
-func _hit_test_stack(mouse_pos: Vector2, city_id: int) -> int:
-	## Check if mouse_pos (in local coords) hits a stack indicator at this city.
-	## Returns stack_id if hit, -1 otherwise.
+func get_stack_at(local_pos: Vector2) -> Dictionary:
+	## Check if local_pos hits any cached stack indicator rect.
+	## Returns {"stack_id": int, "city_id": int} or empty dict.
 	for stack_id in _stack_indicators:
 		var info: Dictionary = _stack_indicators[stack_id]
-		if int(info["city_id"]) == city_id:
-			var rect: Rect2 = info["rect"] as Rect2
-			if rect.has_point(mouse_pos):
-				return int(stack_id)
-	return -1
+		var rect: Rect2 = info["rect"] as Rect2
+		if rect.has_point(local_pos):
+			return {"stack_id": int(stack_id), "city_id": int(info["city_id"])}
+	return {}
 
 
 func _on_area_hover_enter(city_id: int) -> void:
@@ -395,7 +387,8 @@ func _draw_move_destinations() -> void:
 
 
 func _draw_move_preview_line() -> void:
-	## Draw a line from the selected stack to the hovered destination city.
+	## Draw a line from the selected stack to the hovered destination city,
+	## plus a "Right-click to move" hint label.
 	if _selected_stack_id < 0 or _hovered_city_id < 0:
 		return
 	if _hovered_city_id == _selected_city_id:
@@ -406,8 +399,8 @@ func _draw_move_preview_line() -> void:
 	if not _stack_indicators.has(_selected_stack_id):
 		return
 
-	var stack_info: Dictionary = _stack_indicators[_selected_stack_id]
-	var stack_rect: Rect2 = stack_info["rect"] as Rect2
+	var stack_info_dict: Dictionary = _stack_indicators[_selected_stack_id]
+	var stack_rect: Rect2 = stack_info_dict["rect"] as Rect2
 	var from_pos: Vector2 = stack_rect.get_center()
 	var to_pos: Vector2 = _city_positions.get(_hovered_city_id, Vector2.ZERO)
 
@@ -424,6 +417,14 @@ func _draw_move_preview_line() -> void:
 	var arrow_a: Vector2 = arrow_tip - dir * arrow_size + perp * arrow_size * 0.5
 	var arrow_b: Vector2 = arrow_tip - dir * arrow_size - perp * arrow_size * 0.5
 	draw_colored_polygon(PackedVector2Array([arrow_tip, arrow_a, arrow_b]), line_color)
+
+	# "Right-click" hint label near the destination
+	var font := ThemeDB.fallback_font
+	var hint_text := "Right-click"
+	var hint_size := font.get_string_size(hint_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9)
+	var hint_pos: Vector2 = to_pos + Vector2(-hint_size.x / 2.0, 28)
+	draw_rect(Rect2(hint_pos + Vector2(-3, -10), Vector2(hint_size.x + 6, 14)), Color(0.0, 0.0, 0.0, 0.7))
+	draw_string(font, hint_pos, hint_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.3, 1.0, 0.3, 0.9))
 
 
 # --- Stacks ---

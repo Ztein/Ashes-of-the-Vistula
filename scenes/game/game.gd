@@ -17,7 +17,6 @@ var _tick_count: int = 0
 var _camera_speed: float = 400.0
 var _map_bounds: Rect2 = Rect2()  # Bounding box of all cities (with padding)
 var _paused: bool = false
-var _pending_deselect: bool = false
 
 @onready var _hex_map: Node2D = $HexMap
 @onready var _camera: Camera2D = $Camera2D
@@ -60,10 +59,6 @@ func _init_game() -> void:
 	_game_state.initialize(_map_data, _scenario_data, _balance)
 
 	_hex_map.setup(_game_state, _map_data, _scenario_data)
-	_hex_map.city_clicked.connect(_on_city_clicked)
-	_hex_map.stack_clicked.connect(_on_stack_clicked)
-	_hex_map.stack_double_clicked.connect(_on_stack_double_clicked)
-	_hex_map.right_clicked.connect(_on_right_clicked)
 
 	_game_state.city_captured.connect(_on_city_captured)
 	_game_state.siege_started.connect(_on_siege_started)
@@ -89,7 +84,6 @@ func _init_game() -> void:
 	_tick_count = 0
 	_selected_city_id = -1
 	_selected_stack_id = -1
-	_pending_deselect = false
 
 	# Fit camera to show all cities
 	_fit_camera_to_map()
@@ -99,12 +93,6 @@ func _init_game() -> void:
 func _process(delta: float) -> void:
 	if _game_state == null:
 		return
-
-	# Deferred deselect: if _unhandled_input set the flag and no city/stack
-	# click cleared it, deselect now (click was on empty space).
-	if _pending_deselect:
-		_deselect_all()
-		_pending_deselect = false
 
 	_handle_camera(delta)
 
@@ -193,19 +181,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _game_state == null:
 		return
 
-	# Mouse input
+	# Mouse input — all click handling is here (no Area2D click signals)
 	if event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_camera.zoom = Vector2.ONE * clampf(_camera.zoom.x * 1.1, 0.3, 3.0)
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_camera.zoom = Vector2.ONE * clampf(_camera.zoom.x * 0.9, 0.3, 3.0)
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			_deselect_all()
-		elif event.button_index == MOUSE_BUTTON_LEFT:
-			# Defer deselect: Area2D physics picking runs after _unhandled_input.
-			# If a city/stack click fires, it clears this flag. Otherwise,
-			# _process will deselect (click was on empty space).
-			_pending_deselect = true
+		match event.button_index:
+			MOUSE_BUTTON_LEFT:
+				if event.double_click:
+					_handle_double_click()
+				else:
+					_handle_left_click()
+			MOUSE_BUTTON_RIGHT:
+				_handle_right_click()
+			MOUSE_BUTTON_WHEEL_UP:
+				_camera.zoom = Vector2.ONE * clampf(_camera.zoom.x * 1.1, 0.3, 3.0)
+			MOUSE_BUTTON_WHEEL_DOWN:
+				_camera.zoom = Vector2.ONE * clampf(_camera.zoom.x * 0.9, 0.3, 3.0)
 
 	# Keyboard commands
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -230,86 +219,83 @@ var _selected_city_id: int = -1
 var _selected_stack_id: int = -1
 
 
-func _on_city_clicked(city_id: int) -> void:
-	_pending_deselect = false
-	if _game_state == null or _game_state.is_game_over() or _paused:
+func _handle_left_click() -> void:
+	## Left-click = select/inspect only. Never issues move commands.
+	if _game_state.is_game_over() or _paused:
 		return
+	var mouse_local := _hex_map.get_local_mouse_position()
 
-	# If a stack is selected and we click a different city, try to move
-	if _selected_stack_id >= 0 and city_id != _selected_city_id:
-		var stack := _game_state.get_stack(_selected_stack_id)
-		if stack != null and not stack.is_moving:
-			var result := _game_state.submit_command({
-				"type": "move_stack",
-				"player_id": PLAYER_ID,
-				"stack_id": _selected_stack_id,
-				"target_city_id": city_id,
-			})
-			if result:
+	# Priority 1: check if clicking a stack indicator
+	var stack_hit: Dictionary = _hex_map.get_stack_at(mouse_local)
+	if not stack_hit.is_empty():
+		var stack := _game_state.get_stack(stack_hit["stack_id"])
+		if stack != null and not stack.is_empty() and stack.owner_id == PLAYER_ID:
+			# Toggle: clicking already-selected stack deselects
+			if _selected_stack_id == stack_hit["stack_id"]:
 				_deselect_all()
-				_hex_map.queue_redraw()
 				return
-		# Move failed (not adjacent, pinned, no orders) — do nothing
+			_selected_city_id = stack_hit["city_id"]
+			_selected_stack_id = stack_hit["stack_id"]
+			_hex_map.set_selection(_selected_city_id, _selected_stack_id)
+			_hex_map.queue_redraw()
+			_update_stack_info()
+			_update_combat_info()
+			_update_move_destinations()
+			return
+
+	# Priority 2: find nearest city
+	var city_id: int = _hex_map.get_nearest_city(mouse_local)
+	if city_id < 0:
+		_deselect_all()  # Clicked empty space far from any city
 		return
 
-	# Clicking the same city with a stack selected — deselect
-	if city_id == _selected_city_id and _selected_stack_id >= 0:
-		_deselect_all()
-		return
-
-	# No stack selected — show city info only, no stack auto-selection
+	# Select the city and auto-select first own stack there
 	_selected_city_id = city_id
 	_selected_stack_id = -1
-	_hex_map.set_selection(_selected_city_id, -1)
-	_hex_map.set_move_destinations([])
-	_hex_map.queue_redraw()
-	_update_stack_info()
-	_update_combat_info()
-
-
-func _on_stack_clicked(stack_id: int, city_id: int) -> void:
-	_pending_deselect = false
-	if _game_state == null or _game_state.is_game_over() or _paused:
-		return
-
-	# If we already have a stack selected at a different city, treat as move
-	if _selected_stack_id >= 0 and city_id != _selected_city_id:
-		_on_city_clicked(city_id)
-		return
-
-	var stack := _game_state.get_stack(stack_id)
-	if stack == null or stack.is_empty():
-		return
-
-	# Only allow selecting own stacks
-	if stack.owner_id != PLAYER_ID:
-		return
-
-	# Toggle: clicking already-selected stack deselects
-	if _selected_stack_id == stack_id:
-		_deselect_all()
-		return
-
-	# Select this specific stack
-	_selected_city_id = city_id
-	_selected_stack_id = stack_id
+	var own_stacks := _game_state.get_stacks_at_city(PLAYER_ID, city_id)
+	if own_stacks.size() > 0:
+		_selected_stack_id = (own_stacks[0] as UnitStack).id
 	_hex_map.set_selection(_selected_city_id, _selected_stack_id)
+	_hex_map.set_move_destinations([])
 	_hex_map.queue_redraw()
 	_update_stack_info()
 	_update_combat_info()
 	_update_move_destinations()
 
 
-func _on_stack_double_clicked(city_id: int) -> void:
-	if _game_state == null or _game_state.is_game_over() or _paused:
+func _handle_right_click() -> void:
+	## Right-click = move command only. Never changes selection.
+	if _game_state.is_game_over() or _paused:
 		return
-	# Double-click on a city halves the currently selected stack
-	if _selected_stack_id >= 0 and _selected_city_id == city_id:
+	if _selected_stack_id < 0:
+		return  # Nothing selected, right-click does nothing
+
+	var mouse_local := _hex_map.get_local_mouse_position()
+	var city_id: int = _hex_map.get_nearest_city(mouse_local)
+	if city_id < 0 or city_id == _selected_city_id:
+		return  # Clicked same city or empty space
+
+	var stack := _game_state.get_stack(_selected_stack_id)
+	if stack == null or stack.is_moving:
+		return
+
+	var result := _game_state.submit_command({
+		"type": "move_stack",
+		"player_id": PLAYER_ID,
+		"stack_id": _selected_stack_id,
+		"target_city_id": city_id,
+	})
+	if result:
+		_deselect_all()
+		_hex_map.queue_redraw()
+
+
+func _handle_double_click() -> void:
+	## Double-click = split the selected stack.
+	if _game_state.is_game_over() or _paused:
+		return
+	if _selected_stack_id >= 0:
 		_try_split()
-
-
-func _on_right_clicked() -> void:
-	_deselect_all()
 
 
 func _clear_stale_selection() -> void:
@@ -506,14 +492,7 @@ func _on_reset_requested() -> void:
 			_game_state.production_completed.disconnect(_on_production_completed)
 		if _game_state.stack_arrived.is_connected(_on_stack_arrived):
 			_game_state.stack_arrived.disconnect(_on_stack_arrived)
-	if _hex_map.city_clicked.is_connected(_on_city_clicked):
-		_hex_map.city_clicked.disconnect(_on_city_clicked)
-	if _hex_map.stack_clicked.is_connected(_on_stack_clicked):
-		_hex_map.stack_clicked.disconnect(_on_stack_clicked)
-	if _hex_map.stack_double_clicked.is_connected(_on_stack_double_clicked):
-		_hex_map.stack_double_clicked.disconnect(_on_stack_double_clicked)
-	if _hex_map.right_clicked.is_connected(_on_right_clicked):
-		_hex_map.right_clicked.disconnect(_on_right_clicked)
+	# No hex_map click signal disconnections needed — all click handling is in _unhandled_input
 
 	# Clear hex map children (click areas)
 	for child in _hex_map.get_children():
