@@ -272,3 +272,42 @@ func test_battle_dps_and_hp_values_from_config() -> void:
 	var expected_hp: float = 100.0 - 10.0 * tick_delta
 	assert_approx(attacker.hp_pool, expected_hp, 0.01, "HP reduced by config DPS")
 	assert_approx(defender.hp_pool, expected_hp, 0.01, "HP reduced by config DPS")
+
+
+# --- Bug Fix: phantom stacks with zero HP pool ---
+
+func test_battle_skips_zero_hp_pool_stacks() -> void:
+	# Bug 4+5: A stack with count>0 but hp_pool=0.0 should not block battle resolution.
+	var resolver := CombatResolver.new()
+	var attacker := _make_stack("infantry", 10, 0)
+
+	# Create a phantom defender: count>0 but no HP
+	var phantom := UnitStack.new()
+	phantom.id = 99
+	phantom.owner_id = 1
+	phantom.city_id = 0
+	phantom.unit_type = "infantry"
+	phantom.count = 5
+	# hp_pool = 0.0 (not initialized)
+
+	# Battle with only phantom defender should result in attacker win
+	var result := resolver.tick_battle([attacker], [phantom], _balance)
+	assert_eq(result["result"], CombatResolver.ATTACKER_WIN, "phantom defender should not block attacker win")
+
+
+func test_battle_resolves_with_overwhelming_force_no_phantom_survivors() -> void:
+	# End-to-end: 20 infantry vs 1 infantry. Battle must resolve, no phantom survivors.
+	var resolver := CombatResolver.new()
+	var attacker := _make_stack("infantry", 20, 0)
+	var defender := _make_stack("infantry", 1, 1)
+
+	var result_code := CombatResolver.ONGOING
+	for i in range(500):
+		var result := resolver.tick_battle([attacker], [defender], _balance)
+		result_code = result["result"]
+		if result_code != CombatResolver.ONGOING:
+			break
+
+	assert_eq(result_code, CombatResolver.ATTACKER_WIN, "attacker should win decisively")
+	assert_eq(defender.count, 0, "defender count should be 0")
+	assert_approx(defender.hp_pool, 0.0, 0.01, "defender HP pool should be 0")

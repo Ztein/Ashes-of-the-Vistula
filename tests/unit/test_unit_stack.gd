@@ -35,19 +35,19 @@ func test_stack_total_units_zero() -> void:
 
 func test_stack_total_dps_uses_config_values() -> void:
 	var stack := _make_stack("infantry", 3)
-	# infantry dps=10 => 3*10 = 30
+	stack.init_hp_pools(_balance)  # 300 HP, proportional DPS = (300/100)*10 = 30
 	assert_approx(stack.total_dps(_balance), 30.0, 0.01, "DPS should use config values")
 
 
 func test_stack_total_dps_cavalry() -> void:
 	var stack := _make_stack("cavalry", 2)
-	# cavalry dps=15 => 2*15 = 30
+	stack.init_hp_pools(_balance)  # 160 HP, proportional DPS = (160/80)*15 = 30
 	assert_approx(stack.total_dps(_balance), 30.0, 0.01, "cavalry DPS")
 
 
 func test_stack_total_siege_damage_uses_config() -> void:
 	var stack := _make_stack("artillery", 2)
-	# artillery siege=20 => 2*20 = 40
+	stack.init_hp_pools(_balance)  # 120 HP, proportional siege = (120/60)*20 = 40
 	assert_approx(stack.total_siege_damage(_balance), 40.0, 0.01, "siege damage from config")
 
 
@@ -182,7 +182,7 @@ func test_stack_apply_damage_reduces_hp() -> void:
 	stack.init_hp_pools(_balance)  # 500 HP
 	stack.apply_damage(100.0, _balance)
 	assert_approx(stack.hp_pool, 400.0, 0.01, "HP reduced by damage")
-	assert_eq(stack.count, 4, "ceil(400/100) = 4 units remaining")
+	assert_eq(stack.count, 4, "floor(400/100) = 4 units remaining")
 
 
 func test_stack_apply_damage_eliminates_when_hp_depleted() -> void:
@@ -202,4 +202,46 @@ func test_stack_is_empty_when_count_zero() -> void:
 
 func test_stack_is_not_empty_with_units() -> void:
 	var stack := _make_stack("infantry", 1)
-	assert_false(stack.is_empty(), "stack with units is not empty")
+	stack.init_hp_pools(_balance)
+	assert_false(stack.is_empty(), "stack with units and HP is not empty")
+
+
+# --- Bug Fix: ceili phantom unit prevention ---
+
+func test_apply_damage_phantom_dps_prevented_by_hp_proportional() -> void:
+	# Bug 1: ceili() inflates count, but DPS is now HP-proportional so it doesn't matter.
+	# 2 artillery (60 HP each) = 120 HP. Take 59 damage → 61 HP.
+	# ceili(61/60) = 2 (count), but DPS = (61/60)*5 = 5.08, not 2*5 = 10.
+	var stack := _make_stack("artillery", 2)
+	stack.init_hp_pools(_balance)  # 120 HP
+	stack.apply_damage(59.0, _balance)
+	assert_approx(stack.hp_pool, 61.0, 0.01, "HP = 120 - 59 = 61")
+	# DPS should be proportional to HP, not inflated by count
+	var expected_dps: float = (61.0 / 60.0) * 5.0
+	assert_approx(stack.total_dps(_balance), expected_dps, 0.01, "DPS proportional to HP, not count")
+
+
+func test_apply_damage_exact_unit_boundary_keeps_correct_count() -> void:
+	# When HP is exactly on a unit boundary, count should be correct
+	var stack := _make_stack("infantry", 3)
+	stack.init_hp_pools(_balance)  # 300 HP
+	stack.apply_damage(100.0, _balance)  # 200 HP remaining = exactly 2 units
+	assert_eq(stack.count, 2, "exactly 2 units worth of HP = 2 count")
+
+
+func test_zero_hp_pool_stack_deals_no_dps() -> void:
+	# A stack with hp_pool=0 must deal 0 DPS regardless of count
+	var stack := _make_stack("infantry", 5)
+	# Don't init HP — hp_pool stays 0.0
+	assert_approx(stack.total_dps(_balance), 0.0, 0.01, "zero HP pool = zero DPS")
+	assert_approx(stack.total_siege_damage(_balance), 0.0, 0.01, "zero HP pool = zero siege")
+
+
+# --- Bug Fix: is_empty() checks HP pool ---
+
+func test_is_empty_true_when_hp_pool_zero_but_count_stale() -> void:
+	# Bug 4: is_empty() only checks count. A stack with count>0 but hp_pool=0
+	# should be considered empty.
+	var stack := _make_stack("infantry", 3)
+	# Don't init HP pools — simulates the bug where hp_pool stays 0
+	assert_true(stack.is_empty(), "stack with count > 0 but hp_pool = 0 should be empty")

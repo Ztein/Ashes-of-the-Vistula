@@ -505,6 +505,8 @@ func _tick_production(delta: float) -> void:
 		var city: City = city_obj as City
 		if city.owner_id < 0:
 			continue
+		if _sieges.has(city.id) or _battles.has(city.id):
+			continue
 
 		var local_units := _count_units_at_city(city.id)
 		var supply_available := not _supply_system.is_at_supply_cap(
@@ -576,6 +578,7 @@ func _create_stack(owner: int, city: int, utype: String, ucount: int) -> UnitSta
 	stack.city_id = city
 	stack.unit_type = utype
 	stack.count = ucount
+	stack.init_hp_pools(_balance)
 	_stacks[stack.id] = stack
 	return stack
 
@@ -616,11 +619,13 @@ func _count_units_at_city(city_id: int) -> int:
 
 func _add_produced_unit(city: City, utype: String) -> void:
 	# Find existing same-type stack at this city
+	var hp_each: float = float(_balance.get("units", {}).get(utype, {}).get("hp", 100))
 	var stacks := _get_player_stacks_at_city(city.owner_id, city.id)
 	for s in stacks:
 		var stack: UnitStack = s as UnitStack
 		if stack.unit_type == utype:
 			stack.count += 1
+			stack.hp_pool += hp_each
 			return
 
 	# No existing stack of this type — create a new one
